@@ -51,6 +51,9 @@ path = "src/tensemem/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["src/tensemem"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"src/tensemem/storage/sqlite/migrations" = "tensemem/storage/sqlite/migrations"
+
 [tool.hatch.build.targets.sdist]
 include = ["src", "tests", "README.md", "LICENSE", "pyproject.toml"]
 
