@@ -28,6 +28,7 @@ from tensemem.core.models import (
 )
 from tensemem.core.normalize import normalize_key, normalize_value
 from tensemem.core.resolver import IncomingOp, resolve
+from tensemem.pipeline.snapshot import ExtractSnapshot, load_extract_snapshot
 from tensemem.security.fence import strip as strip_fences
 from tensemem.security.fence import wrap as wrap_fence
 from tensemem.storage.sqlite import SqliteDatabase
@@ -184,6 +185,21 @@ class Memory:
     ) -> FactSet:
         key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
         return self._db.read(lambda conn: read_state(conn, get_scope(conn, key)))
+
+    def extract_snapshot(
+        self,
+        user_id: str,
+        *,
+        reference_time: str | None = None,
+        agent_id: str = "",
+        namespace: str = "default",
+    ) -> ExtractSnapshot:
+        """Registry plus ACTIVE facts for the extractor prompt."""
+        key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
+        as_of = reference_time or self._db.now()[:10]
+        return self._db.read(
+            lambda conn: load_extract_snapshot(conn, get_scope(conn, key), reference_time=as_of)
+        )
 
     def context(
         self,
