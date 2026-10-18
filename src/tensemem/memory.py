@@ -7,23 +7,29 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from tensemem.core.clock import Clock, utc_now
+from tensemem.core.context import count_tokens, pack_facts
 from tensemem.core.errors import UnknownFactError, UnknownPredicateError
 from tensemem.core.models import (
     AddResult,
     Cardinality,
+    ContextResult,
     ExplainResult,
     ExtractedOp,
     FactSet,
     FactSource,
     Mutation,
+    OnStale,
     OpKind,
     Predicate,
     PredicateSpec,
     Scope,
     ScopeKey,
+    StaleMemoryError,
 )
 from tensemem.core.normalize import normalize_key, normalize_value
 from tensemem.core.resolver import IncomingOp, resolve
+from tensemem.security.fence import strip as strip_fences
+from tensemem.security.fence import wrap as wrap_fence
 from tensemem.storage.sqlite import SqliteDatabase
 from tensemem.storage.sqlite.entities import (
     SELF_NAME,
@@ -39,6 +45,7 @@ from tensemem.storage.sqlite.facts import (
     mark_rejected,
     restore_displaced,
 )
+from tensemem.storage.sqlite.meta import get_fence_tag
 from tensemem.storage.sqlite.reads import forget_scope, read_explain, read_history, read_state
 from tensemem.storage.sqlite.registry import get_predicate, register_predicate
 from tensemem.storage.sqlite.scopes import get_or_create_scope, get_scope, get_scope_by_id
@@ -177,6 +184,54 @@ class Memory:
     ) -> FactSet:
         key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
         return self._db.read(lambda conn: read_state(conn, get_scope(conn, key)))
+
+    def context(
+        self,
+        user_id: str,
+        query: str = "",
+        *,
+        max_tokens: int = 300,
+        min_seq: int | None = None,
+        on_stale: OnStale = OnStale.FLAG,
+        fence: bool = True,
+        agent_id: str = "",
+        namespace: str = "default",
+    ) -> ContextResult:
+        """Render current facts for a prompt. Waiting for a worker comes later."""
+        key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
+        as_of = self._db.now()[:10]
+
+        def load(conn: sqlite3.Connection) -> ContextResult:
+            facts = read_state(conn, get_scope(conn, key))
+            if (
+                min_seq is not None
+                and facts.freshness.as_of_seq < min_seq
+                and on_stale is OnStale.RAISE
+            ):
+                raise StaleMemoryError(min_seq=min_seq, freshness=facts.freshness)
+            tag = get_fence_tag(conn) or ""
+            reserve = count_tokens(wrap_fence("", tag)) if fence else 0
+            body_budget = max(max_tokens - reserve, 0)
+            body, ids = pack_facts(facts.facts, as_of=as_of, max_tokens=body_budget, query=query)
+            text = wrap_fence(body, tag) if fence else body
+            return ContextResult(
+                text=text,
+                facts_used=ids,
+                token_count=count_tokens(text),
+                freshness=facts.freshness,
+            )
+
+        return self._db.read(load)
+
+    def fence(self, text: str) -> str:
+        """Wrap custom-rendered memory in this database's contamination fence."""
+        tag = self._db.read(get_fence_tag) or ""
+        return wrap_fence(text, tag)
+
+    def unfence(self, text: str) -> str:
+        """Strip this database's fenced spans from ``text``."""
+        tag = self._db.read(get_fence_tag) or ""
+        return strip_fences(text, tag)
 
     def history(
         self,

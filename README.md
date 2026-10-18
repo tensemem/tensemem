@@ -2,7 +2,7 @@
 
 **Memory that knows its tenses.** Embedded, deterministic memory that AI agents can safely act on.
 
-> Status: pre-alpha. The deterministic API can set, correct, and read versioned facts. LLM extraction is next.
+> Status: pre-alpha. The deterministic API can set facts and render fenced `context()` for prompts. LLM extraction is next.
 
 ## The problem
 
@@ -33,9 +33,12 @@ mem.state(user_id="u1").values  # {"lives_in": "Bangalore"}
 history = mem.history(user_id="u1", predicate="lives_in")
 bangalore = next(fact for fact in history.facts if fact.object == "Bangalore")
 mem.correct(bangalore.id)  # restores the value it displaced ("Delhi")
+
+ctx = mem.context(user_id="u1", max_tokens=200)
+print(ctx.text)  # fenced Markdown; ctx.freshness.is_current
 ```
 
-`mem.add(...)` / `mem.context(...)` come with the extraction pipeline.
+`mem.add(...)` (natural language) comes with the extraction pipeline.
 
 ## Contributing
 

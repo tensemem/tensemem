@@ -32,15 +32,13 @@ def test_write_and_read_see_same_data() -> None:
         def insert(conn: sqlite3.Connection) -> int:
             conn.execute(
                 "INSERT INTO meta(key, value) VALUES (?, ?)",
-                ("fence_tag", "abc"),
+                ("probe", "abc"),
             )
             conn.commit()
             return 1
 
         assert db.write(insert) == 1
-        value = db.read(
-            lambda c: c.execute("SELECT value FROM meta WHERE key='fence_tag'").fetchone()
-        )
+        value = db.read(lambda c: c.execute("SELECT value FROM meta WHERE key='probe'").fetchone())
         assert value is not None
         assert value["value"] == "abc"
 

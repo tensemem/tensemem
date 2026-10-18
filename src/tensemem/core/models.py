@@ -275,6 +275,17 @@ class ExplainResult(BaseModel):
     superseded_by: str | None = None
 
 
+class ContextResult(BaseModel):
+    """Rendered prompt block from ``Memory.context``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    text: str
+    facts_used: tuple[str, ...] = ()
+    token_count: int = Field(ge=0)
+    freshness: Freshness
+
+
 class OnStale(StrEnum):
     FLAG = "flag"
     RAISE = "raise"

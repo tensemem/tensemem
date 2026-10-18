@@ -18,6 +18,7 @@ from tensemem.core.ids import new_ulid, ulid_timestamp_ms
 from tensemem.core.models import (
     AddResult,
     Cardinality,
+    ContextResult,
     EdgeKind,
     EntityKind,
     EpisodeKind,
@@ -62,6 +63,7 @@ __all__ = [
     "ApplyError",
     "Cardinality",
     "Clock",
+    "ContextResult",
     "EdgeKind",
     "EntityKind",
     "EntitySpec",
