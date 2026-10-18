@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from html import escape
 from importlib import resources
 
 from tensemem.pipeline.snapshot import CompactFact, ExtractSnapshot, RegistryEntry
@@ -39,12 +40,30 @@ def _format_registry(entries: Sequence[RegistryEntry]) -> str:
         return "(none)"
     lines: list[str] = []
     for item in entries:
-        desc = f": {item.description}" if item.description else ""
-        lines.append(f"- {item.name} ({item.cardinality.value}){desc}")
+        lines.append(
+            "<registry_entry>"
+            f"<name>{_field(item.name)}</name>"
+            f"<cardinality>{_field(item.cardinality.value)}</cardinality>"
+            f"<description>{_field(item.description)}</description>"
+            "</registry_entry>"
+        )
     return "\n".join(lines)
 
 
 def _format_facts(facts: Sequence[CompactFact]) -> str:
     if not facts:
         return "(none)"
-    return "\n".join(f"- {fact.subject} {fact.predicate} {fact.object}" for fact in facts)
+    return "\n".join(
+        "<fact>"
+        f"<subject>{_field(fact.subject)}</subject>"
+        f"<predicate>{_field(fact.predicate)}</predicate>"
+        f"<object>{_field(fact.object)}</object>"
+        "</fact>"
+        for fact in facts
+    )
+
+
+def _field(text: str) -> str:
+    """Flatten and escape a stored field so it cannot change prompt structure."""
+    flat = " ".join(text.split())
+    return escape(flat, quote=True).replace("{", "&#123;").replace("}", "&#125;")
