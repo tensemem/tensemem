@@ -202,7 +202,7 @@ def _reinforce(
     now: str,
     pending: dict[str, str],
 ) -> ApplyResult:
-    row = _require_target(conn, mutation, pending)
+    row = _require_target(conn, mutation, ctx, pending)
     blended = _blend(
         float(row["confidence"]),
         mutation.op.confidence,
@@ -238,7 +238,7 @@ def _supersede(
     now: str,
     pending: dict[str, str],
 ) -> ApplyResult:
-    old = _require_target(conn, mutation, pending)
+    old = _require_target(conn, mutation, ctx, pending)
     conn.execute(
         """
         UPDATE facts
@@ -274,7 +274,7 @@ def _close(
     now: str,
     pending: dict[str, str],
 ) -> ApplyResult:
-    row = _require_target(conn, mutation, pending)
+    row = _require_target(conn, mutation, ctx, pending)
     conn.execute(
         """
         UPDATE facts
@@ -330,7 +330,10 @@ def _reject(
 
 
 def _require_target(
-    conn: sqlite3.Connection, mutation: Mutation, pending: dict[str, str]
+    conn: sqlite3.Connection,
+    mutation: Mutation,
+    ctx: ApplyContext,
+    pending: dict[str, str],
 ) -> sqlite3.Row:
     raw = mutation.target_fact_id
     if raw is None:
@@ -340,6 +343,17 @@ def _require_target(
     row = get_fact(conn, public_id)
     if row is None:
         msg = f"{mutation.kind} target {raw!r} does not exist"
+        raise ApplyError(msg)
+    if row["status"] != FactStatus.ACTIVE.value:
+        msg = f"{mutation.kind} target {raw!r} is {row['status']}, not ACTIVE"
+        raise ApplyError(msg)
+    # Object may differ on ONE supersede; scope/subject/predicate must still match.
+    if (
+        row["scope_id"] != ctx.scope_id
+        or row["subject_id"] != ctx.subject_id
+        or row["predicate_id"] != ctx.predicate_id
+    ):
+        msg = f"{mutation.kind} target {raw!r} does not match the apply context"
         raise ApplyError(msg)
     return row
 

@@ -72,6 +72,59 @@ def test_second_active_in_the_same_slot_is_rejected(db: SqliteDatabase) -> None:
         db.transaction(write)
 
 
+def test_cannot_change_a_fact_that_is_already_closed(db: SqliteDatabase) -> None:
+    world = _world(db)
+    inserted = _apply(
+        db,
+        Mutation(kind="insert_active", op=_op("Bangalore"), reason="no_active_fact"),
+        world.ctx,
+    )
+    _apply(
+        db,
+        Mutation(
+            kind="retract",
+            op=_op("Bangalore", op=OpKind.RETRACT),
+            reason="retract",
+            target_fact_id=inserted.public_id,
+        ),
+        world.ctx,
+    )
+
+    with pytest.raises(ApplyError, match="not ACTIVE"):
+        _apply(
+            db,
+            Mutation(
+                kind="reinforce",
+                op=_op("Bangalore"),
+                reason="same_value",
+                target_fact_id=inserted.public_id,
+            ),
+            world.ctx,
+        )
+
+
+def test_cannot_target_a_fact_from_another_scope(db: SqliteDatabase) -> None:
+    first = _world(db, user_id="u1")
+    second = _world(db, user_id="u2")
+    inserted = _apply(
+        db,
+        Mutation(kind="insert_active", op=_op("Bangalore"), reason="no_active_fact"),
+        first.ctx,
+    )
+
+    with pytest.raises(ApplyError, match="does not match the apply context"):
+        _apply(
+            db,
+            Mutation(
+                kind="retract",
+                op=_op("Bangalore", op=OpKind.RETRACT),
+                reason="retract",
+                target_fact_id=inserted.public_id,
+            ),
+            second.ctx,
+        )
+
+
 def test_supersede_then_reject(db: SqliteDatabase) -> None:
     world = _world(db)
     inserted = _apply(
@@ -285,9 +338,9 @@ class _World:
         self.ctx = ctx
 
 
-def _world(db: SqliteDatabase) -> _World:
+def _world(db: SqliteDatabase, *, user_id: str = "u1") -> _World:
     def setup(conn: sqlite3.Connection) -> ApplyContext:
-        scope = get_or_create_scope(conn, ScopeKey(user_id="u1"), now=db.now())
+        scope = get_or_create_scope(conn, ScopeKey(user_id=user_id), now=db.now())
         predicate = register_predicate(
             conn, PredicateSpec(name="lives_in", cardinality=Cardinality.ONE), now=db.now()
         )
