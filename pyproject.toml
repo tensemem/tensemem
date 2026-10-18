@@ -28,6 +28,7 @@ classifiers = [
   "Typing :: Typed",
 ]
 dependencies = [
+  "dateparser>=1.4.3",
   "pydantic>=2.12",
   "python-ulid>=3.1,<5",
 ]

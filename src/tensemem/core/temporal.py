@@ -1,65 +1,34 @@
 """Resolve relative dates to valid time, and compare periods (ADR 0005).
 
-The extractor is asked for ISO dates. This module validates that output and
-falls back to a small English phrase list when the date is missing or invalid.
-Unknown dates use the episode reference time with precision ``unknown``.
+ISO strings are classified here so we know the precision (year / month / day /
+instant). English phrases go to ``dateparser``. Unknown dates use the episode
+reference time with precision ``unknown``.
 """
 
 from __future__ import annotations
 
 import re
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
+import dateparser
+from dateparser.search import search_dates
 from pydantic import BaseModel, ConfigDict
 
 from tensemem.core.clock import INSTANT_WIDTH, format_instant, parse_instant
 from tensemem.core.models import ValidPrecision
 
-_MONTHS = {
-    "january": 1,
-    "february": 2,
-    "march": 3,
-    "april": 4,
-    "may": 5,
-    "june": 6,
-    "july": 7,
-    "august": 8,
-    "september": 9,
-    "october": 10,
-    "november": 11,
-    "december": 12,
-    "jan": 1,
-    "feb": 2,
-    "mar": 3,
-    "apr": 4,
-    "jun": 6,
-    "jul": 7,
-    "aug": 8,
-    "sep": 9,
-    "sept": 9,
-    "oct": 10,
-    "nov": 11,
-    "dec": 12,
-}
-_MONTH_ALT = "|".join(sorted(_MONTHS, key=len, reverse=True))
-
-_ISO_INSTANT = re.compile(
-    r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})[T ]"
-    r"(?P<hour>\d{2}):(?P<minute>\d{2}):(?P<second>\d{2})"
-    r"(?:\.(?P<frac>\d+))?(?P<tz>Z|[+-]\d{2}:?\d{2})?$"
+_MONTH_ONLY = re.compile(
+    r"^(january|february|march|april|may|june|july|august|september|october|"
+    r"november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)$",
+    re.IGNORECASE,
 )
-_ISO_DATE = re.compile(r"^(?P<year>\d{4})-(?P<month>\d{2})-(?P<day>\d{2})$")
-_ISO_MONTH = re.compile(r"^(?P<year>\d{4})-(?P<month>\d{2})$")
-_ISO_YEAR = re.compile(r"^(?P<year>\d{4})$")
-_EMBEDDED_DATE = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
-_N_AGO = re.compile(r"\b(\d+)\s+(days?|weeks?|months?|years?)\s+ago\b", re.IGNORECASE)
-_RELATIVE_DAY = re.compile(r"\b(yesterday|today|tomorrow)\b", re.IGNORECASE)
-_LAST_THIS_NEXT = re.compile(r"\b(last|this|next)\s+(week|month|year)\b", re.IGNORECASE)
-_LAST_MONTH_NAME = re.compile(rf"\blast\s+({_MONTH_ALT})\b", re.IGNORECASE)
-_MONTH_YEAR = re.compile(rf"\b(?:in|since|from)\s+({_MONTH_ALT})\s+(\d{{4}})\b", re.IGNORECASE)
-_BARE_MONTH_YEAR = re.compile(rf"\b({_MONTH_ALT})\s+(\d{{4}})\b", re.IGNORECASE)
-_IN_YEAR = re.compile(r"\b(?:since|in|from)\s+(\d{4})\b", re.IGNORECASE)
-_IN_MONTH = re.compile(rf"\b(?:in|since|from)\s+({_MONTH_ALT})\b", re.IGNORECASE)
+_YEAR_PHRASE = re.compile(r"^(?:since|in|from)?\s*\d{4}$", re.IGNORECASE)
+_MONTH_WORD = re.compile(
+    r"\b(months?|january|february|march|april|may|june|july|august|september|"
+    r"october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b",
+    re.IGNORECASE,
+)
 
 
 class ResolvedTime(BaseModel):
@@ -91,25 +60,23 @@ def resolve_valid_time(
 ) -> ResolvedTime:
     """Turn an extractor date or a phrase into storage-form valid time.
 
-    Order: ISO in ``value``, English phrases in ``value``, then the same on
-    ``evidence``. If nothing parses, use ``reference_time`` as ``unknown``.
+    Order: ISO in ``value``, ``dateparser`` on ``value``, then ``dateparser``
+    search on ``evidence``. If nothing parses, use ``reference_time`` as
+    ``unknown``.
     """
     ref = parse_reference_time(reference_time)
-    for candidate in (value, evidence):
-        if candidate is None:
-            continue
-        text = candidate.strip()
-        if not text:
-            continue
+    if value is not None and value.strip():
+        text = value.strip()
         iso = _try_iso(text)
         if iso is not None:
             return iso
-        phrase = _try_phrase(text, ref)
-        if phrase is not None:
-            return phrase
-        embedded = _try_embedded_iso(text)
-        if embedded is not None:
-            return embedded
+        parsed = _from_dateparser(text, ref, allow_month_only=True)
+        if parsed is not None:
+            return parsed
+    if evidence.strip():
+        parsed = _from_dateparser(evidence, ref, allow_month_only=False)
+        if parsed is not None:
+            return parsed
     return ResolvedTime(valid_from=format_instant(ref), valid_precision=ValidPrecision.UNKNOWN)
 
 
@@ -135,128 +102,83 @@ def is_newer_or_unknown(
 
 
 def _try_iso(text: str) -> ResolvedTime | None:
-    instant = _ISO_INSTANT.match(text)
-    if instant is not None:
-        parsed = _datetime_from_iso(instant.groupdict())
-        return None if parsed is None else _resolved(parsed, ValidPrecision.INSTANT)
-    day = _ISO_DATE.match(text)
-    if day is not None:
-        parsed = _date(int(day["year"]), int(day["month"]), int(day["day"]))
-        return None if parsed is None else _resolved(parsed, ValidPrecision.DAY)
-    month = _ISO_MONTH.match(text)
-    if month is not None:
-        parsed = _date(int(month["year"]), int(month["month"]), 1)
-        return None if parsed is None else _resolved(parsed, ValidPrecision.MONTH)
-    year = _ISO_YEAR.match(text)
-    if year is not None:
-        parsed = _date(int(year["year"]), 1, 1)
-        return None if parsed is None else _resolved(parsed, ValidPrecision.YEAR)
+    """Parse a whole-string ISO date so precision comes from the shape, not a guess."""
+    if len(text) == 4 and text.isdigit():
+        return _date(int(text), 1, 1, ValidPrecision.YEAR)
+    if len(text) == 7 and text[4] == "-":
+        try:
+            return _date(int(text[:4]), int(text[5:7]), 1, ValidPrecision.MONTH)
+        except ValueError:
+            return None
+    if len(text) == 10 and text[4] == "-" and text[7] == "-":
+        try:
+            day = datetime.fromisoformat(text).replace(tzinfo=UTC)
+        except ValueError:
+            return None
+        return _resolved(day, ValidPrecision.DAY)
+    if "T" in text:
+        try:
+            instant = datetime.fromisoformat(text.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if instant.tzinfo is None:
+            instant = instant.replace(tzinfo=UTC)
+        return _resolved(instant.astimezone(UTC), ValidPrecision.INSTANT)
     return None
 
 
-def _try_embedded_iso(text: str) -> ResolvedTime | None:
-    match = _EMBEDDED_DATE.search(text)
-    if match is None:
+def _from_dateparser(text: str, ref: datetime, *, allow_month_only: bool) -> ResolvedTime | None:
+    settings = _settings(ref)
+    parsed = dateparser.parse(text, languages=["en"], settings=settings)
+    if parsed is not None:
+        return _from_parsed(text, parsed)
+    found = search_dates(text, languages=["en"], settings=settings)
+    if not found:
         return None
-    return _try_iso(match.group(1))
-
-
-def _try_phrase(text: str, ref: datetime) -> ResolvedTime | None:
-    ago = _N_AGO.search(text)
-    if ago is not None:
-        return _n_ago(int(ago.group(1)), ago.group(2).casefold(), ref)
-    day = _RELATIVE_DAY.search(text)
-    if day is not None:
-        return _relative_day(day.group(1).casefold(), ref)
-    unit = _LAST_THIS_NEXT.search(text)
-    if unit is not None:
-        return _last_this_next(unit.group(1).casefold(), unit.group(2).casefold(), ref)
-    last_month = _LAST_MONTH_NAME.search(text)
-    if last_month is not None:
-        month = _named_month(ref, last_month.group(1), strict_before=True)
-        return _resolved(month, ValidPrecision.MONTH)
-    month_year = _MONTH_YEAR.search(text) or _BARE_MONTH_YEAR.search(text)
-    if month_year is not None:
-        parsed = _date(int(month_year.group(2)), _MONTHS[month_year.group(1).casefold()], 1)
-        return None if parsed is None else _resolved(parsed, ValidPrecision.MONTH)
-    year = _IN_YEAR.search(text)
-    if year is not None:
-        parsed = _date(int(year.group(1)), 1, 1)
-        return None if parsed is None else _resolved(parsed, ValidPrecision.YEAR)
-    in_month = _IN_MONTH.search(text)
-    if in_month is not None:
-        month = _named_month(ref, in_month.group(1), strict_before=False)
-        return _resolved(month, ValidPrecision.MONTH)
+    for match, instant in found:
+        if allow_month_only or not _MONTH_ONLY.fullmatch(match.strip()):
+            return _from_parsed(match, instant)
     return None
 
 
-def _n_ago(count: int, unit: str, ref: datetime) -> ResolvedTime:
-    if unit.startswith("day"):
-        return _resolved(_start_of_day(ref) - timedelta(days=count), ValidPrecision.DAY)
-    if unit.startswith("week"):
-        return _resolved(_start_of_day(ref) - timedelta(weeks=count), ValidPrecision.DAY)
-    if unit.startswith("month"):
-        return _resolved(_add_months(_start_of_month(ref), -count), ValidPrecision.MONTH)
-    return _resolved(datetime(ref.year - count, 1, 1, tzinfo=UTC), ValidPrecision.YEAR)
+def _from_parsed(match: str, instant: datetime) -> ResolvedTime:
+    instant = instant.replace(tzinfo=UTC) if instant.tzinfo is None else instant.astimezone(UTC)
+    precision = _precision_from_match(match)
+    if precision is ValidPrecision.YEAR:
+        instant = datetime(instant.year, 1, 1, tzinfo=UTC)
+    elif precision is ValidPrecision.MONTH:
+        instant = datetime(instant.year, instant.month, 1, tzinfo=UTC)
+    elif precision is ValidPrecision.DAY:
+        instant = datetime(instant.year, instant.month, instant.day, tzinfo=UTC)
+    return _resolved(instant, precision)
 
 
-def _relative_day(word: str, ref: datetime) -> ResolvedTime:
-    day = _start_of_day(ref)
-    if word == "yesterday":
-        day = day - timedelta(days=1)
-    elif word == "tomorrow":
-        day = day + timedelta(days=1)
-    return _resolved(day, ValidPrecision.DAY)
+def _precision_from_match(text: str) -> ValidPrecision:
+    iso = _try_iso(text.strip())
+    if iso is not None:
+        return iso.valid_precision
+    folded = text.strip()
+    if _YEAR_PHRASE.fullmatch(folded):
+        return ValidPrecision.YEAR
+    if _MONTH_WORD.search(folded):
+        return ValidPrecision.MONTH
+    return ValidPrecision.DAY
 
 
-def _last_this_next(which: str, unit: str, ref: datetime) -> ResolvedTime:
-    shift = {"last": -1, "this": 0, "next": 1}[which]
-    if unit == "week":
-        start = _start_of_iso_week(ref) + timedelta(weeks=shift)
-        return _resolved(start, ValidPrecision.DAY)
-    if unit == "month":
-        return _resolved(_add_months(_start_of_month(ref), shift), ValidPrecision.MONTH)
-    return _resolved(datetime(ref.year + shift, 1, 1, tzinfo=UTC), ValidPrecision.YEAR)
+def _settings(ref: datetime) -> dict[str, Any]:
+    return {
+        "RELATIVE_BASE": ref.replace(tzinfo=None),
+        "TIMEZONE": "UTC",
+        "TO_TIMEZONE": "UTC",
+        "RETURN_AS_TIMEZONE_AWARE": True,
+        "PREFER_DATES_FROM": "past",
+        "PREFER_DAY_OF_MONTH": "first",
+    }
 
 
-def _named_month(ref: datetime, name: str, *, strict_before: bool) -> datetime:
-    month = _MONTHS[name.casefold()]
-    year = ref.year
-    if month > ref.month or (strict_before and month == ref.month):
-        year -= 1
-    return datetime(year, month, 1, tzinfo=UTC)
-
-
-def _datetime_from_iso(parts: dict[str, str | None]) -> datetime | None:
-    frac = (parts["frac"] or "0").ljust(6, "0")[:6]
-    tz = parts["tz"]
-    if tz is None or tz == "Z":
-        tzinfo: timezone = UTC
-    else:
-        sign = 1 if tz[0] == "+" else -1
-        digits = tz[1:].replace(":", "")
-        hours = int(digits[:2])
-        minutes = int(digits[2:4]) if len(digits) >= 4 else 0
-        tzinfo = timezone(sign * timedelta(hours=hours, minutes=minutes))
+def _date(year: int, month: int, day: int, precision: ValidPrecision) -> ResolvedTime | None:
     try:
-        instant = datetime(
-            int(parts["year"] or 0),
-            int(parts["month"] or 0),
-            int(parts["day"] or 0),
-            int(parts["hour"] or 0),
-            int(parts["minute"] or 0),
-            int(parts["second"] or 0),
-            int(frac),
-            tzinfo=tzinfo,
-        )
-    except ValueError:
-        return None
-    return instant.astimezone(UTC)
-
-
-def _date(year: int, month: int, day: int) -> datetime | None:
-    try:
-        return datetime(year, month, day, tzinfo=UTC)
+        return _resolved(datetime(year, month, day, tzinfo=UTC), precision)
     except ValueError:
         return None
 
@@ -266,10 +188,10 @@ def _period(valid_from: str, precision: ValidPrecision) -> tuple[datetime, datet
     if precision is ValidPrecision.INSTANT:
         return start, start + timedelta(microseconds=1)
     if precision is ValidPrecision.DAY:
-        day = _start_of_day(start)
+        day = datetime(start.year, start.month, start.day, tzinfo=UTC)
         return day, day + timedelta(days=1)
     if precision is ValidPrecision.MONTH:
-        month = _start_of_month(start)
+        month = datetime(start.year, start.month, 1, tzinfo=UTC)
         return month, _add_months(month, 1)
     if precision is ValidPrecision.YEAR:
         year = datetime(start.year, 1, 1, tzinfo=UTC)
@@ -282,19 +204,6 @@ def _as_datetime(text: str) -> datetime:
     if len(text) == INSTANT_WIDTH and text.endswith("Z"):
         return parse_instant(text)
     return parse_reference_time(text)
-
-
-def _start_of_day(instant: datetime) -> datetime:
-    return datetime(instant.year, instant.month, instant.day, tzinfo=UTC)
-
-
-def _start_of_month(instant: datetime) -> datetime:
-    return datetime(instant.year, instant.month, 1, tzinfo=UTC)
-
-
-def _start_of_iso_week(instant: datetime) -> datetime:
-    day = _start_of_day(instant)
-    return day - timedelta(days=day.weekday())
 
 
 def _add_months(instant: datetime, months: int) -> datetime:

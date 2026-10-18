@@ -27,7 +27,7 @@ def test_normalize_falls_back_to_evidence_phrase() -> None:
             (_op(object="Bangalore", evidence="I moved last week"),),
             reference_time="2026-10-18",
         )
-        assert incoming[0].op.valid_from == "2026-10-05T00:00:00.000000Z"
+        assert incoming[0].op.valid_from == "2026-10-11T00:00:00.000000Z"
         assert incoming[0].op.valid_precision is ValidPrecision.DAY
 
 
