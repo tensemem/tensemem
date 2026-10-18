@@ -36,17 +36,25 @@ def apply_migrations(
     clock: Clock = utc_now,
     migrations_dir: Path | None = None,
 ) -> list[int]:
-    """Apply pending ``NNNN_name.sql`` files in order. Returns versions applied."""
+    """Apply pending ``NNNN_name.sql`` files in order. Returns versions applied.
+
+    Each migration and its ``schema_migrations`` row commit atomically.
+    """
     newly: list[int] = []
     for version, path in pending_migrations(conn, migrations_dir=migrations_dir):
         sql = path.read_text(encoding="utf-8")
-        conn.executescript(sql)
-        conn.execute(
-            "INSERT INTO schema_migrations(version, applied_at) VALUES (?, ?)",
-            (version, format_instant(clock())),
+        # Values are an int and a fixed-format timestamp, so inlining them is safe.
+        record = (
+            "INSERT INTO schema_migrations(version, applied_at) "
+            f"VALUES ({version}, '{format_instant(clock())}');"
         )
+        try:
+            conn.executescript(f"BEGIN IMMEDIATE;\n{sql}\n{record}\nCOMMIT;")
+        except BaseException:
+            if conn.in_transaction:
+                conn.execute("ROLLBACK")
+            raise
         newly.append(version)
-    conn.commit()
     return newly
 
 

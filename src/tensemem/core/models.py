@@ -86,15 +86,57 @@ class EpisodeStatus(StrEnum):
     DELETED = "DELETED"
 
 
+ValueType = Literal["text", "entity", "number", "date", "bool"]
+EntityKind = Literal["person", "place", "org", "tech", "thing", "self"]
+
+
 class PredicateSpec(BaseModel):
-    """How a new predicate should be registered when the extractor invents one."""
+    """Definition of a predicate: from the starter ontology, a developer, or the extractor."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    name: str
+    name: str = Field(min_length=1)
     cardinality: Cardinality = Cardinality.ONE
     description: str = ""
+    value_type: ValueType = "text"
+    pinned: bool = False
     aliases: tuple[str, ...] = ()
+
+
+class Predicate(BaseModel):
+    """A predicate stored in the registry."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: int
+    name: str
+    cardinality: Cardinality
+    description: str
+    value_type: ValueType
+    pinned: bool
+    builtin: bool
+
+
+class ScopeKey(BaseModel):
+    """Identifies whose memory this is."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    user_id: str = Field(min_length=1)
+    agent_id: str = ""
+    namespace: str = Field(default="default", min_length=1)
+
+
+class Scope(BaseModel):
+    """A stored scope plus the entity that represents its user ("self")."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: int
+    key: ScopeKey
+    self_entity_id: int
+    applied_seq: int = Field(ge=0)
+    projection_version: int = Field(ge=1)
 
 
 class ExtractedOp(BaseModel):

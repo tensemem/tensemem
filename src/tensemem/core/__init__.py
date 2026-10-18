@@ -8,11 +8,13 @@ from tensemem.core.clock import (
     parse_instant,
     utc_now,
 )
+from tensemem.core.errors import RegistryConflictError
 from tensemem.core.ids import new_ulid, ulid_timestamp_ms
 from tensemem.core.models import (
     AddResult,
     Cardinality,
     EdgeKind,
+    EntityKind,
     EpisodeKind,
     EpisodeRole,
     EpisodeStatus,
@@ -27,10 +29,16 @@ from tensemem.core.models import (
     MutationKind,
     OnStale,
     OpKind,
+    Predicate,
     PredicateSpec,
+    Scope,
+    ScopeKey,
     StaleMemoryError,
     ValidPrecision,
+    ValueType,
 )
+from tensemem.core.normalize import normalize_key, normalize_value
+from tensemem.core.ontology import EntitySpec, Ontology, load_ontology
 
 __all__ = [
     "INSTANT_WIDTH",
@@ -38,6 +46,8 @@ __all__ = [
     "Cardinality",
     "Clock",
     "EdgeKind",
+    "EntityKind",
+    "EntitySpec",
     "EpisodeKind",
     "EpisodeRole",
     "EpisodeStatus",
@@ -52,12 +62,21 @@ __all__ = [
     "Mutation",
     "MutationKind",
     "OnStale",
+    "Ontology",
     "OpKind",
+    "Predicate",
     "PredicateSpec",
+    "RegistryConflictError",
+    "Scope",
+    "ScopeKey",
     "StaleMemoryError",
     "ValidPrecision",
+    "ValueType",
     "format_instant",
+    "load_ontology",
     "new_ulid",
+    "normalize_key",
+    "normalize_value",
     "parse_instant",
     "ulid_timestamp_ms",
     "utc_now",

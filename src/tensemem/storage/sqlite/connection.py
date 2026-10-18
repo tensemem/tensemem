@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Generator
+from contextlib import contextmanager
 from pathlib import Path
 
 MIN_SQLITE_VERSION = (3, 35, 0)
@@ -38,7 +40,8 @@ def connect(
     :class:`~tensemem.storage.sqlite.database.SqliteDatabase` instance.
     """
     uri = resolve_uri(path, read_only=read_only, shared_memory_name=shared_memory_name)
-    conn = sqlite3.connect(uri, uri=True, check_same_thread=False)
+    # Autocommit mode: transactions are opened explicitly with immediate_transaction().
+    conn = sqlite3.connect(uri, uri=True, check_same_thread=False, isolation_level=None)
     conn.row_factory = sqlite3.Row
     try:
         apply_pragmas(conn, read_only=read_only)
@@ -49,6 +52,18 @@ def connect(
         conn.close()
         raise
     return conn
+
+
+@contextmanager
+def immediate_transaction(conn: sqlite3.Connection) -> Generator[sqlite3.Connection]:
+    """``BEGIN IMMEDIATE`` ... ``COMMIT``, rolling back if the block raises."""
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        yield conn
+    except BaseException:
+        conn.execute("ROLLBACK")
+        raise
+    conn.execute("COMMIT")
 
 
 def apply_pragmas(conn: sqlite3.Connection, *, read_only: bool) -> None:
