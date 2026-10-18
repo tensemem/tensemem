@@ -30,6 +30,7 @@ from tensemem.core.normalize import normalize_key, normalize_value
 from tensemem.core.ontology import Ontology
 from tensemem.core.resolver import IncomingOp, resolve
 from tensemem.pipeline.normalize import normalize_ops
+from tensemem.pipeline.policy import apply_policy
 from tensemem.pipeline.snapshot import ExtractSnapshot, load_extract_snapshot
 from tensemem.security.fence import strip as strip_fences
 from tensemem.security.fence import wrap as wrap_fence
@@ -212,16 +213,18 @@ class Memory:
         user_id: str,
         ops: Sequence[ExtractedOp],
         *,
+        reference_time: str | None = None,
         agent_id: str = "",
         namespace: str = "default",
     ) -> tuple[IncomingOp, ...]:
-        """Map extractor ops onto registry names, aliases, and entities."""
+        """Map extractor ops onto registry names, fill valid time, apply modality policy."""
         key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
 
         def write(conn: sqlite3.Connection) -> tuple[IncomingOp, ...]:
             now = self._db.now()
             scope = get_or_create_scope(conn, key, now=now)
-            return normalize_ops(conn, scope, ops, now=now)
+            incoming = normalize_ops(conn, scope, ops, now=now)
+            return apply_policy(conn, incoming, reference_time=reference_time or now, now=now)
 
         return self._db.transaction(write)
 

@@ -2,7 +2,7 @@
 
 **Memory that knows its tenses.** Embedded, deterministic memory that AI agents can safely act on.
 
-> Status: pre-alpha. The deterministic API can set facts and render fenced `context()`. Extraction and the normalizer are in; `add()` is next.
+> Status: pre-alpha. The deterministic API can set facts and render fenced `context()`. Extraction, the normalizer, and date/modality policy are in; `add()` is next.
 
 ## The problem
 
@@ -38,7 +38,7 @@ ctx = mem.context(user_id="u1", max_tokens=200)
 print(ctx.text)  # fenced Markdown; ctx.freshness.is_current
 ```
 
-`mem.add(...)` (natural language) comes next. `extract` asks a provider for typed ops; `normalize` maps those ops onto the registry and aliases. Tests use `FakeExtractor`.
+`mem.add(...)` (natural language) comes next. `extract` asks a provider for typed ops; `normalize` maps those ops onto the registry, fills valid time from ISO dates or phrases such as "last week", and remaps planned or negated claims so they cannot overwrite a current fact. Tests use `FakeExtractor`.
 
 ## Contributing
 

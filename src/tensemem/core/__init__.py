@@ -56,6 +56,12 @@ from tensemem.core.resolver import (
     resolve,
 )
 from tensemem.core.slots import slot_key
+from tensemem.core.temporal import (
+    ResolvedTime,
+    is_newer_or_unknown,
+    parse_reference_time,
+    resolve_valid_time,
+)
 
 __all__ = [
     "INSTANT_WIDTH",
@@ -92,6 +98,7 @@ __all__ = [
     "PredicateSpec",
     "RegistryConflictError",
     "RejectedClaim",
+    "ResolvedTime",
     "Scope",
     "ScopeKey",
     "Snapshot",
@@ -101,11 +108,14 @@ __all__ = [
     "ValidPrecision",
     "ValueType",
     "format_instant",
+    "is_newer_or_unknown",
     "new_ulid",
     "normalize_key",
     "normalize_value",
     "parse_instant",
+    "parse_reference_time",
     "resolve",
+    "resolve_valid_time",
     "slot_key",
     "strip_articles",
     "ulid_timestamp_ms",

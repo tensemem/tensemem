@@ -20,6 +20,7 @@ from tensemem.core.models import (
     OpKind,
     ValidPrecision,
 )
+from tensemem.core.temporal import is_newer_or_unknown
 
 MIN_CONFIDENCE = 0.5
 MIN_SUPERSEDE_CONFIDENCE = 0.75
@@ -137,7 +138,9 @@ def _set_or_add(incoming: IncomingOp, active: list[FactSnap], snapshot: Snapshot
     if op.confidence < snapshot.min_supersede_confidence:
         return [Mutation(kind="insert_candidate", op=op, reason="below_supersede_confidence")]
 
-    if _is_newer_or_unknown(op, current):
+    if is_newer_or_unknown(
+        op.valid_from, op.valid_precision, current.valid_from, current.valid_precision
+    ):
         return [Mutation(kind="supersede", op=op, reason="newer_value", target_fact_id=current.id)]
     return [Mutation(kind="insert_historical", op=op, reason="older_than_active")]
 
@@ -224,17 +227,6 @@ def _is_rejected(incoming: IncomingOp, snapshot: Snapshot) -> bool:
         and claim.until_seq >= snapshot.episode_seq
         for claim in snapshot.rejected_claims
     )
-
-
-def _is_newer_or_unknown(op: ExtractedOp, current: FactSnap) -> bool:
-    if op.valid_from is None or current.valid_from is None:
-        return True
-    if (
-        op.valid_precision is ValidPrecision.UNKNOWN
-        or current.valid_precision is ValidPrecision.UNKNOWN
-    ):
-        return True
-    return op.valid_from >= current.valid_from
 
 
 def _drop(op: ExtractedOp, reason: str) -> Mutation:

@@ -2,6 +2,7 @@
 
 from tensemem.pipeline.extractor import extract
 from tensemem.pipeline.normalize import normalize_ops
+from tensemem.pipeline.policy import apply_policy, planned_predicate
 from tensemem.pipeline.prompt import PROMPT_VERSION, render_messages
 from tensemem.pipeline.snapshot import (
     CompactFact,
@@ -15,8 +16,10 @@ __all__ = [
     "CompactFact",
     "ExtractSnapshot",
     "RegistryEntry",
+    "apply_policy",
     "extract",
     "load_extract_snapshot",
     "normalize_ops",
+    "planned_predicate",
     "render_messages",
 ]

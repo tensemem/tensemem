@@ -61,6 +61,29 @@ def test_set_older_value_is_historical() -> None:
     assert mutations[0].kind == "insert_historical"
 
 
+def test_overlapping_month_and_day_supersede() -> None:
+    mutations = resolve(
+        [
+            _set(
+                "Bangalore",
+                valid_from="2026-10-10T00:00:00.000000Z",
+                valid_precision=ValidPrecision.DAY,
+            )
+        ],
+        Snapshot(
+            facts=(
+                _fact(
+                    "Delhi",
+                    id="f1",
+                    valid_from="2026-10-01T00:00:00.000000Z",
+                    valid_precision=ValidPrecision.MONTH,
+                ),
+            )
+        ),
+    )
+    assert mutations[0].kind == "supersede"
+
+
 def test_unknown_dates_supersede() -> None:
     mutations = resolve([_set("Bangalore")], Snapshot(facts=(_fact("Delhi", id="f1"),)))
     assert mutations[0].kind == "supersede"
