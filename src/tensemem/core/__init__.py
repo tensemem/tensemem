@@ -17,6 +17,7 @@ from tensemem.core.clock import (
 from tensemem.core.errors import (
     ApplyError,
     RegistryConflictError,
+    StaleLeaseError,
     UnknownFactError,
     UnknownJobError,
     UnknownPredicateError,
@@ -118,6 +119,7 @@ __all__ = [
     "Scope",
     "ScopeKey",
     "Snapshot",
+    "StaleLeaseError",
     "StaleMemoryError",
     "UnknownFactError",
     "UnknownJobError",

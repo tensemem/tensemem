@@ -19,3 +19,7 @@ class UnknownFactError(LookupError):
 
 class UnknownJobError(LookupError):
     """No job exists with that id."""
+
+
+class StaleLeaseError(ValueError):
+    """complete() or fail() ran after the lease was lost or expired."""

@@ -45,7 +45,7 @@ from tensemem.storage.sqlite.entities import (
     resolve_entity,
     subject_label,
 )
-from tensemem.storage.sqlite.episodes import insert_episode, set_applied_seq
+from tensemem.storage.sqlite.episodes import advance_watermark, insert_episode
 from tensemem.storage.sqlite.facts import (
     ApplyContext,
     apply_mutations,
@@ -392,7 +392,7 @@ class Memory:
                 view = to_fact_view(row)
                 op = _op(view.subject, view.predicate, replacement, OpKind.SET)
                 _apply_ops(conn, scope, (op,), episode_id=seq, now=now)
-            set_applied_seq(conn, scope.id, seq)
+            advance_watermark(conn, scope.id)
             return AddResult(seq=seq, episode_ids=(public_id,))
 
         return self._db.transaction(write)
@@ -429,7 +429,7 @@ class Memory:
             scope = get_or_create_scope(conn, key, now=now)
             seq, public_id = insert_episode(conn, scope_id=scope.id, content=content, now=now)
             _apply_ops(conn, scope, ops, episode_id=seq, now=now)
-            set_applied_seq(conn, scope.id, seq)
+            advance_watermark(conn, scope.id)
             return AddResult(seq=seq, episode_ids=(public_id,))
 
         return self._db.transaction(write)

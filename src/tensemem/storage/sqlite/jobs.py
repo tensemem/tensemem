@@ -7,12 +7,13 @@ in episode order, one at a time, so the freshness watermark stays a prefix.
 from __future__ import annotations
 
 import json
+import random
 import sqlite3
 from datetime import timedelta
 
 from tensemem.core.backoff import LEASE_SECONDS, MAX_ATTEMPTS, backoff_seconds
 from tensemem.core.clock import format_instant, parse_instant
-from tensemem.core.errors import UnknownJobError
+from tensemem.core.errors import StaleLeaseError, UnknownJobError
 from tensemem.core.ids import new_ulid
 from tensemem.core.models import EpisodeStatus, JobKind, JobStatus, JobView
 from tensemem.storage.sqlite.episodes import advance_watermark, set_episode_status
@@ -99,13 +100,17 @@ def complete(
     job_id: str,
     *,
     now: str,
+    lease_until: str,
     episode_status: EpisodeStatus = EpisodeStatus.PROCESSED,
 ) -> JobView:
     """Mark the job done, finish its episode, and advance the watermark."""
     job = _require_job(conn, job_id)
-    conn.execute(
-        "UPDATE jobs SET status = 'DONE', lease_until = NULL, last_error = NULL WHERE id = ?",
-        (int(job.id),),
+    _update_held_lease(
+        conn,
+        job_id=job.id,
+        lease_until=lease_until,
+        now=now,
+        sql="UPDATE jobs SET status = 'DONE', lease_until = NULL, last_error = NULL",
     )
     if job.episode_id is not None:
         set_episode_status(conn, job.episode_id, episode_status)
@@ -120,36 +125,43 @@ def fail(
     error: str,
     *,
     now: str,
+    lease_until: str,
     provider_error: bool = False,
-    jitter: float = 1.0,
+    jitter: float | None = None,
 ) -> JobView:
     """Backoff and requeue, or mark DEAD after ``MAX_ATTEMPTS``."""
     job = _require_job(conn, job_id)
     attempts = job.attempts + 1
-    if provider_error:
-        record_provider_failure(conn, now=now)
+    frac = random.random() if jitter is None else jitter
     if attempts >= MAX_ATTEMPTS:
-        conn.execute(
-            """
-            UPDATE jobs
-            SET status = 'DEAD', attempts = ?, last_error = ?, lease_until = NULL
-            WHERE id = ?
-            """,
-            (attempts, error, int(job.id)),
+        _update_held_lease(
+            conn,
+            job_id=job.id,
+            lease_until=lease_until,
+            now=now,
+            sql="UPDATE jobs SET status = 'DEAD', attempts = ?, last_error = ?, lease_until = NULL",
+            params=(attempts, error),
         )
+        if provider_error:
+            record_provider_failure(conn, now=now)
         if job.episode_id is not None:
             set_episode_status(conn, job.episode_id, EpisodeStatus.FAILED)
             advance_watermark(conn, job.scope_id)
         return _require_job(conn, job_id)
-    nxt = _add_seconds(now, backoff_seconds(attempts, jitter=jitter))
-    conn.execute(
-        """
-        UPDATE jobs
-        SET status = 'QUEUED', attempts = ?, last_error = ?, next_run_at = ?, lease_until = NULL
-        WHERE id = ?
-        """,
-        (attempts, error, nxt, int(job.id)),
+    nxt = _add_seconds(now, backoff_seconds(attempts, jitter=frac))
+    _update_held_lease(
+        conn,
+        job_id=job.id,
+        lease_until=lease_until,
+        now=now,
+        sql=(
+            "UPDATE jobs SET status = 'QUEUED', attempts = ?, last_error = ?, "
+            "next_run_at = ?, lease_until = NULL"
+        ),
+        params=(attempts, error, nxt),
     )
+    if provider_error:
+        record_provider_failure(conn, now=now)
     return _require_job(conn, job_id)
 
 
@@ -225,13 +237,58 @@ def _circuit_open(conn: sqlite3.Connection, now: str) -> bool:
 
 
 def _expire_leases(conn: sqlite3.Connection, now: str) -> None:
+    rows = conn.execute(
+        "SELECT * FROM jobs WHERE status = 'LEASED' AND lease_until < ?",
+        (now,),
+    ).fetchall()
+    for row in rows:
+        _expire_one(conn, _to_job(row), now)
+
+
+def _expire_one(conn: sqlite3.Connection, job: JobView, now: str) -> None:
+    token = job.lease_until
+    if token is None:
+        return
+    attempts = job.attempts + 1
+    if attempts >= MAX_ATTEMPTS:
+        cur = conn.execute(
+            """
+            UPDATE jobs
+            SET status = 'DEAD', attempts = ?, last_error = ?, lease_until = NULL
+            WHERE id = ? AND status = 'LEASED' AND lease_until = ? AND lease_until < ?
+            """,
+            (attempts, "lease expired", int(job.id), token, now),
+        )
+        if cur.rowcount == 1 and job.episode_id is not None:
+            set_episode_status(conn, job.episode_id, EpisodeStatus.FAILED)
+            advance_watermark(conn, job.scope_id)
+        return
+    nxt = _add_seconds(now, backoff_seconds(attempts, jitter=0.0))
     conn.execute(
         """
-        UPDATE jobs SET status = 'QUEUED', lease_until = NULL
-        WHERE status = 'LEASED' AND lease_until < ?
+        UPDATE jobs
+        SET status = 'QUEUED', attempts = ?, last_error = ?, next_run_at = ?, lease_until = NULL
+        WHERE id = ? AND status = 'LEASED' AND lease_until = ? AND lease_until < ?
         """,
-        (now,),
+        (attempts, "lease expired", nxt, int(job.id), token, now),
     )
+
+
+def _update_held_lease(
+    conn: sqlite3.Connection,
+    *,
+    job_id: str,
+    lease_until: str,
+    now: str,
+    sql: str,
+    params: tuple[object, ...] = (),
+) -> None:
+    cur = conn.execute(
+        f"{sql} WHERE id = ? AND status = 'LEASED' AND lease_until = ? AND lease_until > ?",
+        (*params, int(job_id), lease_until, now),
+    )
+    if cur.rowcount != 1:
+        raise StaleLeaseError(f"stale lease for job {job_id}")
 
 
 def _require_job(conn: sqlite3.Connection, job_id: str) -> JobView:
