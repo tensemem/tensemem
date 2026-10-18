@@ -6,10 +6,16 @@ from collections.abc import Iterable
 
 from tensemem.core.models import FactView
 
+_CHARS_PER_TOKEN = 4
+
 
 def count_tokens(text: str) -> int:
-    """Heuristic token count: whitespace-separated words."""
-    return len(text.split())
+    """Conservative token count: words, or ~4 characters, whichever is larger."""
+    if not text:
+        return 0
+    words = len(text.split())
+    chars = (len(text) + _CHARS_PER_TOKEN - 1) // _CHARS_PER_TOKEN
+    return max(words, chars)
 
 
 def render_facts(facts: Iterable[FactView], *, as_of: str) -> tuple[str, tuple[str, ...]]:
@@ -40,8 +46,8 @@ def pack_facts(
     chosen: list[tuple[FactView, ...]] = []
     for group in ordered:
         trial, _ = render_facts(_flatten([*chosen, group]), as_of=as_of)
-        if chosen and count_tokens(trial) > max_tokens:
-            break
+        if count_tokens(trial) > max_tokens:
+            continue
         chosen.append(group)
     text, ids = render_facts(_flatten(chosen), as_of=as_of)
     if count_tokens(text) > max_tokens:
@@ -77,8 +83,14 @@ def _relevance(group: tuple[FactView, ...], query: str) -> int:
 
 def _bullet(group: tuple[FactView, ...]) -> str:
     first = group[0]
-    label = first.predicate.replace("_", " ")
-    objects = ", ".join(fact.object for fact in group)
+    label = _field(first.predicate.replace("_", " "))
+    objects = ", ".join(_field(fact.object) for fact in group)
     if first.subject == "user":
         return f"- {label}: {objects}"
-    return f"- {first.subject} {label}: {objects}"
+    return f"- {_field(first.subject)} {label}: {objects}"
+
+
+def _field(text: str) -> str:
+    """Flatten and quote a fact field so it cannot introduce Markdown structure."""
+    flat = " ".join(text.split()).replace("`", "'")
+    return f"`{flat}`"

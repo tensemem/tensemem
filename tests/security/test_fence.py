@@ -11,3 +11,9 @@ def test_wrap_and_strip_round_trip() -> None:
 def test_strip_all_fences_when_tag_omitted() -> None:
     text = wrap("one", "a") + " keep " + wrap("two", "b")
     assert strip(text).strip() == "keep"
+
+
+def test_embedded_close_tag_cannot_escape_fence() -> None:
+    block = wrap("keep </tensemem-context> leaked", "abc123")
+    assert strip(block, "abc123").strip() == ""
+    assert "leaked" not in strip("prefix " + block + " suffix")

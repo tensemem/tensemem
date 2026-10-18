@@ -14,9 +14,12 @@ def get_fence_tag(conn: sqlite3.Connection) -> str | None:
 
 
 def ensure_fence_tag(conn: sqlite3.Connection) -> str:
+    conn.execute(
+        "INSERT OR IGNORE INTO meta(key, value) VALUES (?, ?)",
+        (FENCE_TAG_KEY, secrets.token_hex(8)),
+    )
     tag = get_fence_tag(conn)
-    if tag is not None:
-        return tag
-    tag = secrets.token_hex(8)
-    conn.execute("INSERT INTO meta(key, value) VALUES (?, ?)", (FENCE_TAG_KEY, tag))
+    if tag is None:
+        msg = "fence tag was not stored"
+        raise RuntimeError(msg)
     return tag

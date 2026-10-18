@@ -4,7 +4,7 @@ import pytest
 
 from tensemem import Memory
 from tensemem.core.clock import FrozenClock
-from tensemem.core.models import Cardinality, OnStale, StaleMemoryError
+from tensemem.core.models import Cardinality, StaleMemoryError
 
 
 def test_context_is_fenced_and_fresh() -> None:
@@ -18,7 +18,7 @@ def test_context_is_fenced_and_fresh() -> None:
         assert ctx.freshness.is_current
         assert ctx.freshness.as_of_seq == added.seq or ctx.freshness.as_of_seq >= added.seq
         assert "<tensemem-context tag=" in ctx.text
-        assert "- lives in: Bangalore" in ctx.text
+        assert "- `lives in`: `Bangalore`" in ctx.text
         assert "Rust" in ctx.text
         assert "What I know" not in mem.unfence(ctx.text)
         assert ctx.facts_used
@@ -37,6 +37,8 @@ def test_context_query_and_token_budget() -> None:
 
         tiny = mem.context(user_id="u1", max_tokens=3)
         assert tiny.facts_used == ()
+        assert tiny.text == ""
+        assert tiny.token_count == 0
 
 
 def test_min_seq_raise_and_custom_fence() -> None:
@@ -44,7 +46,9 @@ def test_min_seq_raise_and_custom_fence() -> None:
         mem.register_predicate("lives_in")
         mem.set(user_id="u1", predicate="lives_in", value="Delhi")
         with pytest.raises(StaleMemoryError):
-            mem.context(user_id="u1", min_seq=99, on_stale=OnStale.RAISE)
+            mem.context(user_id="u1", min_seq=99, on_stale="raise")
+        with pytest.raises(ValueError, match="nope"):
+            mem.context(user_id="u1", on_stale="nope")
         flagged = mem.context(user_id="u1", min_seq=99)
         assert flagged.freshness.as_of_seq < 99
         custom = mem.fence("hello")

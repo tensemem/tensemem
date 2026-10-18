@@ -192,7 +192,7 @@ class Memory:
         *,
         max_tokens: int = 300,
         min_seq: int | None = None,
-        on_stale: OnStale = OnStale.FLAG,
+        on_stale: OnStale | str = OnStale.FLAG,
         fence: bool = True,
         agent_id: str = "",
         namespace: str = "default",
@@ -200,17 +200,25 @@ class Memory:
         """Render current facts for a prompt. Waiting for a worker comes later."""
         key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
         as_of = self._db.now()[:10]
+        policy = OnStale(on_stale)
 
         def load(conn: sqlite3.Connection) -> ContextResult:
             facts = read_state(conn, get_scope(conn, key))
             if (
                 min_seq is not None
                 and facts.freshness.as_of_seq < min_seq
-                and on_stale is OnStale.RAISE
+                and policy is OnStale.RAISE
             ):
                 raise StaleMemoryError(min_seq=min_seq, freshness=facts.freshness)
             tag = get_fence_tag(conn) or ""
             reserve = count_tokens(wrap_fence("", tag)) if fence else 0
+            if fence and reserve > max_tokens:
+                return ContextResult(
+                    text="",
+                    facts_used=(),
+                    token_count=0,
+                    freshness=facts.freshness,
+                )
             body_budget = max(max_tokens - reserve, 0)
             body, ids = pack_facts(facts.facts, as_of=as_of, max_tokens=body_budget, query=query)
             text = wrap_fence(body, tag) if fence else body

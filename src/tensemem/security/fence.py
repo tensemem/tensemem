@@ -4,12 +4,16 @@ from __future__ import annotations
 
 import re
 
-_OPEN = re.compile(r"<tensemem-context\s+tag=\"([^\"]+)\">")
+_OPEN = "<tensemem-context"
+_CLOSE = "</tensemem-context>"
+_ESC_OPEN = "<tensemem-context\u2060"
+_ESC_CLOSE = "</tensemem-context\u2060>"
 _BLOCK = re.compile(r"<tensemem-context\s+tag=\"[^\"]+\">.*?</tensemem-context>", re.DOTALL)
 
 
 def wrap(text: str, tag: str) -> str:
-    return f'<tensemem-context tag="{tag}">\n{text.rstrip()}\n</tensemem-context>\n'
+    body = _encode(_OPEN, _ESC_OPEN, _encode(_CLOSE, _ESC_CLOSE, text.rstrip()))
+    return f'{_OPEN} tag="{tag}">\n{body}\n{_CLOSE}\n'
 
 
 def strip(text: str, tag: str | None = None) -> str:
@@ -21,3 +25,7 @@ def strip(text: str, tag: str | None = None) -> str:
         re.DOTALL,
     )
     return pattern.sub("", text)
+
+
+def _encode(needle: str, replacement: str, text: str) -> str:
+    return text.replace(needle, replacement)
