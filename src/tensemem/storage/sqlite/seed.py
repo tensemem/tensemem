@@ -1,4 +1,7 @@
-"""Seed the starter ontology into a database. Safe to run on every open."""
+"""Apply an :class:`~tensemem.core.ontology.Ontology` to a database.
+
+Not run automatically. Callers pass an ontology they built or loaded from a file.
+"""
 
 from __future__ import annotations
 
@@ -16,16 +19,15 @@ from tensemem.storage.sqlite.registry import (
 
 
 def seed_ontology(conn: sqlite3.Connection, ontology: Ontology, *, now: str) -> None:
-    """Insert built-in predicates, entities, and aliases that are missing.
+    """Insert predicates, entities, and aliases from ``ontology`` that are missing.
 
-    Existing definitions win: a developer who already registered a name or claimed
-    an alias keeps it, and the built-in one is skipped.
+    Existing definitions win: a name or alias already in the DB is left alone.
     """
     for spec in ontology.predicates:
         predicate = get_predicate_by_name(conn, spec.name)
         if predicate is None:
             predicate = register_predicate(
-                conn, spec.model_copy(update={"aliases": ()}), now=now, builtin=True
+                conn, spec.model_copy(update={"aliases": ()}), now=now, builtin=False
             )
         for alias in spec.aliases:
             with suppress(RegistryConflictError):

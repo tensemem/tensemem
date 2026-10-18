@@ -1,0 +1,40 @@
+# Optional example ontology for a personal assistant.
+# Not loaded by the library — apps opt in:
+#
+#   from tensemem.core import Ontology
+#   db.seed(Ontology.from_toml("examples/personal.toml"))
+
+[[predicates]]
+name = "lives_in"
+value_type = "entity"
+description = "City or place the subject currently lives in"
+pinned = true
+aliases = ["city", "home_city", "location", "based_in"]
+
+[[predicates]]
+name = "uses_language"
+cardinality = "MANY"
+value_type = "entity"
+description = "Programming languages the subject uses"
+aliases = ["programming_language", "codes_in"]
+
+[[predicates]]
+name = "employer"
+value_type = "entity"
+description = "Organization the subject currently works for"
+aliases = ["company", "works_at"]
+
+[[predicates]]
+name = "job_title"
+description = "The subject's current role"
+aliases = ["role", "title"]
+
+[[entities]]
+name = "Bangalore"
+kind = "place"
+aliases = ["Bengaluru", "BLR"]
+
+[[entities]]
+name = "PostgreSQL"
+kind = "tech"
+aliases = ["Postgres", "pg"]

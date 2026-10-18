@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any, TypeVar, cast
 
 from tensemem.core.clock import Clock, format_instant, utc_now
-from tensemem.core.ontology import load_ontology
+from tensemem.core.ontology import Ontology
 from tensemem.storage.sqlite.connection import connect, immediate_transaction
 from tensemem.storage.sqlite.migrate import apply_migrations, pending_migrations
 from tensemem.storage.sqlite.seed import seed_ontology
@@ -56,8 +56,6 @@ class SqliteDatabase:
             # Fresh databases skip backup; upgrades of existing files get a .bak copy.
             _backup_if_file(path)
         apply_migrations(self._writer, clock=clock)
-        with immediate_transaction(self._writer) as conn:
-            seed_ontology(conn, load_ontology(), now=self.now())
 
         for _ in range(read_pool_size):
             self._read_pool.put(connect(path, read_only=True, shared_memory_name=self._memory_name))
@@ -93,6 +91,10 @@ class SqliteDatabase:
                 return fn(conn)
 
         return self.write(run)
+
+    def seed(self, ontology: Ontology) -> None:
+        """Optionally load predicates and entities from an app-owned ontology."""
+        self.transaction(lambda conn: seed_ontology(conn, ontology, now=self.now()))
 
     def read(self, fn: Callable[[sqlite3.Connection], T]) -> T:
         """Borrow a read-only connection, run ``fn``, and return it to the pool."""

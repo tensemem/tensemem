@@ -2,7 +2,11 @@ import sqlite3
 
 from tensemem.core.models import Scope, ScopeKey
 from tensemem.storage.sqlite import SqliteDatabase
-from tensemem.storage.sqlite.entities import add_entity_alias, resolve_entity
+from tensemem.storage.sqlite.entities import (
+    add_entity_alias,
+    ensure_global_entity,
+    resolve_entity,
+)
 from tensemem.storage.sqlite.scopes import get_or_create_scope, get_scope
 
 
@@ -37,20 +41,30 @@ def test_get_scope_reads_without_creating(db: SqliteDatabase) -> None:
 def test_global_entity_aliases_resolve_in_any_scope(db: SqliteDatabase) -> None:
     scope = _scope(db, ScopeKey(user_id="u1"))
 
+    def seed_postgres(conn: sqlite3.Connection) -> int:
+        entity_id = ensure_global_entity(conn, "PostgreSQL", kind="tech", now=db.now())
+        add_entity_alias(conn, "PostgreSQL", entity_id)
+        add_entity_alias(conn, "postgres", entity_id)
+        add_entity_alias(conn, "pg", entity_id)
+        return entity_id
+
+    entity_id = db.transaction(seed_postgres)
     postgres = db.read(lambda c: resolve_entity(c, "postgres", scope_id=scope.id))
     pg = db.read(lambda c: resolve_entity(c, "PG", scope_id=scope.id))
 
-    assert postgres is not None
-    assert postgres == pg
+    assert postgres == entity_id
+    assert pg == entity_id
 
 
 def test_scope_alias_overrides_global(db: SqliteDatabase) -> None:
     scope = _scope(db, ScopeKey(user_id="u1"))
 
-    def alias_pg_to_self(conn: sqlite3.Connection) -> None:
+    def setup(conn: sqlite3.Connection) -> None:
+        entity_id = ensure_global_entity(conn, "PostgreSQL", kind="tech", now=db.now())
+        add_entity_alias(conn, "pg", entity_id)
         add_entity_alias(conn, "pg", scope.self_entity_id, scope_id=scope.id)
 
-    db.transaction(alias_pg_to_self)
+    db.transaction(setup)
 
     assert db.read(lambda c: resolve_entity(c, "pg", scope_id=scope.id)) == scope.self_entity_id
 

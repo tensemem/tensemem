@@ -38,7 +38,7 @@ from tensemem.core.models import (
     ValueType,
 )
 from tensemem.core.normalize import normalize_key, normalize_value
-from tensemem.core.ontology import EntitySpec, Ontology, load_ontology
+from tensemem.core.ontology import EntitySpec, Ontology
 
 __all__ = [
     "INSTANT_WIDTH",
@@ -73,7 +73,6 @@ __all__ = [
     "ValidPrecision",
     "ValueType",
     "format_instant",
-    "load_ontology",
     "new_ulid",
     "normalize_key",
     "normalize_value",

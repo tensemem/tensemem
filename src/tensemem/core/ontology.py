@@ -1,11 +1,15 @@
-"""Starter ontology: built-in predicates and common entity aliases (``ontology.toml``)."""
+"""Optional ontology files that apps can load and seed.
+
+The engine ships with an empty registry. An ontology is just a TOML (or
+in-memory) description of predicates and entities that a caller may apply with
+:func:`~tensemem.storage.sqlite.seed.seed_ontology`.
+"""
 
 from __future__ import annotations
 
 import tomllib
 from collections.abc import Callable, Iterable
-from functools import cache
-from importlib import resources
+from pathlib import Path
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -14,7 +18,7 @@ from tensemem.core.normalize import normalize_key, normalize_value
 
 
 class EntitySpec(BaseModel):
-    """A global entity, such as a city or technology, with its common aliases."""
+    """A named entity with optional aliases (global or later scoped by the app)."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -35,12 +39,11 @@ class Ontology(BaseModel):
         _require_unique(((e.name, e.aliases) for e in self.entities), normalize_value)
         return self
 
-
-@cache
-def load_ontology() -> Ontology:
-    """Load the ontology shipped with the package."""
-    text = resources.files("tensemem.core").joinpath("ontology.toml").read_text(encoding="utf-8")
-    return Ontology.model_validate(tomllib.loads(text))
+    @classmethod
+    def from_toml(cls, path: str | Path) -> Ontology:
+        """Load an ontology from a TOML file the app owns."""
+        text = Path(path).read_text(encoding="utf-8")
+        return cls.model_validate(tomllib.loads(text))
 
 
 def _require_unique(
