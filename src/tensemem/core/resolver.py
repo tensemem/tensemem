@@ -1,8 +1,8 @@
 """Deterministic decision table: typed ops become mutations (ADR 0002).
 
 ``resolve`` is a pure function. It does not touch the database. The pipeline
-normalizes names and looks up cardinality before calling it; ``apply`` (later)
-writes the mutations.
+normalizes names and looks up cardinality before calling it;
+``tensemem.storage.sqlite.facts.apply_mutations`` writes the result.
 """
 
 from __future__ import annotations

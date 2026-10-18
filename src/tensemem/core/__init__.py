@@ -8,7 +8,7 @@ from tensemem.core.clock import (
     parse_instant,
     utc_now,
 )
-from tensemem.core.errors import RegistryConflictError
+from tensemem.core.errors import ApplyError, RegistryConflictError
 from tensemem.core.ids import new_ulid, ulid_timestamp_ms
 from tensemem.core.models import (
     AddResult,
@@ -46,10 +46,12 @@ from tensemem.core.resolver import (
     Snapshot,
     resolve,
 )
+from tensemem.core.slots import slot_key
 
 __all__ = [
     "INSTANT_WIDTH",
     "AddResult",
+    "ApplyError",
     "Cardinality",
     "Clock",
     "EdgeKind",
@@ -89,6 +91,7 @@ __all__ = [
     "normalize_value",
     "parse_instant",
     "resolve",
+    "slot_key",
     "ulid_timestamp_ms",
     "utc_now",
 ]
