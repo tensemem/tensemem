@@ -21,6 +21,7 @@ class OpenAIProvider:
         api_key: str | None = None,
     ) -> None:
         self.model = model
+        self.cache_namespace = "openai"
         self._client = client
         self._api_key = api_key
 

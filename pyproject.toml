@@ -34,7 +34,7 @@ dependencies = [
 
 [project.optional-dependencies]
 openai = ["openai>=1.40"]
-anthropic = ["anthropic>=0.40"]
+anthropic = ["anthropic>=1.0"]
 
 [project.urls]
 Homepage = "https://github.com/tensemem/tensemem"

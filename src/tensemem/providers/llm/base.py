@@ -41,9 +41,11 @@ def prompt_key(
     messages: Sequence[Mapping[str, str]],
     schema: type[BaseModel],
     extras: Mapping[str, object] | None = None,
+    namespace: str = "",
 ) -> str:
-    """Stable cache key for (model, messages, schema, extra call args)."""
+    """Stable cache key for provider, model, messages, schema, and call args."""
     payload = {
+        "namespace": namespace,
         "model": model,
         "messages": list(messages),
         "schema": schema.__name__,

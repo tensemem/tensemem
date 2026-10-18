@@ -60,10 +60,23 @@ class CachedProvider:
         schema: type[T],
         **kwargs: Any,
     ) -> T:
-        key = prompt_key(self.model, messages, schema, extras=kwargs or None)
+        key = prompt_key(
+            self.model,
+            messages,
+            schema,
+            extras=kwargs or None,
+            namespace=_namespace(self._inner),
+        )
         hit = self._store.get(key)
         if hit is not None:
             return schema.model_validate_json(hit)
         result = self._inner.structured(messages, schema, **kwargs)
         self._store.put(key, result.model_dump_json())
         return result
+
+
+def _namespace(provider: LLMProvider) -> str:
+    value = getattr(provider, "cache_namespace", None)
+    if isinstance(value, str) and value:
+        return value
+    return type(provider).__name__

@@ -16,6 +16,16 @@ def test_rule_extract_move_and_only_language() -> None:
     assert len(fake.calls) == 1
 
 
+def test_only_elsewhere_does_not_replace_language() -> None:
+    fake = FakeExtractor()
+    result = fake.structured(
+        [{"role": "user", "content": "I only moved to Bangalore and write Rust."}],
+        ExtractionResult,
+    )
+    lang = next(op for op in result.ops if op.predicate == "uses_language")
+    assert lang.op is OpKind.ADD
+
+
 def test_scripted_queue_and_mapping() -> None:
     queued = ExtractionResult(
         ops=(

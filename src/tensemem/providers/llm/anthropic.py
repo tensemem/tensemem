@@ -15,12 +15,13 @@ T = TypeVar("T", bound=BaseModel)
 class AnthropicProvider:
     def __init__(
         self,
-        model: str = "claude-3-5-haiku-latest",
+        model: str = "claude-haiku-5-5",
         *,
         client: object | None = None,
         api_key: str | None = None,
     ) -> None:
         self.model = model
+        self.cache_namespace = "anthropic"
         self._client = client
         self._api_key = api_key
 

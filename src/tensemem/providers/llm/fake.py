@@ -23,6 +23,7 @@ class FakeExtractor:
     """Scripted or rule-based ``LLMProvider`` used by CI."""
 
     model = "fake"
+    cache_namespace = "fake"
 
     def __init__(
         self,
@@ -79,7 +80,7 @@ def _rule_extract(text: str) -> ExtractionResult:
         )
     lang = _LANG.search(text)
     if lang is not None:
-        kind = OpKind.REPLACE_SET if "only" in text.casefold() else OpKind.ADD
+        kind = OpKind.REPLACE_SET if "only" in lang.group(0).casefold() else OpKind.ADD
         ops.append(
             ExtractedOp(
                 subject="user",
