@@ -1,5 +1,11 @@
 """Domain model and the deterministic state resolver."""
 
+from tensemem.core.backoff import (
+    CAP_SECONDS,
+    LEASE_SECONDS,
+    MAX_ATTEMPTS,
+    backoff_seconds,
+)
 from tensemem.core.clock import (
     INSTANT_WIDTH,
     Clock,
@@ -12,6 +18,7 @@ from tensemem.core.errors import (
     ApplyError,
     RegistryConflictError,
     UnknownFactError,
+    UnknownJobError,
     UnknownPredicateError,
 )
 from tensemem.core.ids import new_ulid, ulid_timestamp_ms
@@ -33,6 +40,9 @@ from tensemem.core.models import (
     FactStatus,
     FactView,
     Freshness,
+    JobKind,
+    JobStatus,
+    JobView,
     Modality,
     Mutation,
     MutationKind,
@@ -64,7 +74,10 @@ from tensemem.core.temporal import (
 )
 
 __all__ = [
+    "CAP_SECONDS",
     "INSTANT_WIDTH",
+    "LEASE_SECONDS",
+    "MAX_ATTEMPTS",
     "AddResult",
     "ApplyError",
     "Cardinality",
@@ -88,6 +101,9 @@ __all__ = [
     "Freshness",
     "FrozenClock",
     "IncomingOp",
+    "JobKind",
+    "JobStatus",
+    "JobView",
     "Modality",
     "Mutation",
     "MutationKind",
@@ -104,9 +120,11 @@ __all__ = [
     "Snapshot",
     "StaleMemoryError",
     "UnknownFactError",
+    "UnknownJobError",
     "UnknownPredicateError",
     "ValidPrecision",
     "ValueType",
+    "backoff_seconds",
     "format_instant",
     "is_newer_or_unknown",
     "new_ulid",

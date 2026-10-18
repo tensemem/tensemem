@@ -87,6 +87,20 @@ class EpisodeStatus(StrEnum):
     DELETED = "DELETED"
 
 
+class JobKind(StrEnum):
+    EXTRACT = "extract"
+    EMBED = "embed"
+    DERIVE = "derive"
+    REBUILD = "rebuild"
+
+
+class JobStatus(StrEnum):
+    QUEUED = "QUEUED"
+    LEASED = "LEASED"
+    DONE = "DONE"
+    DEAD = "DEAD"
+
+
 ValueType = Literal["text", "entity", "number", "date", "bool"]
 EntityKind = Literal["person", "place", "org", "tech", "thing", "self"]
 
@@ -188,6 +202,22 @@ class AddResult(BaseModel):
     seq: int = Field(ge=1)
     episode_ids: tuple[str, ...] = ()
     job_id: str | None = None
+
+
+class JobView(BaseModel):
+    """One outbox row, as returned by ``Memory.jobs``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    kind: JobKind
+    scope_id: int
+    status: JobStatus
+    attempts: int = Field(ge=0)
+    next_run_at: str
+    lease_until: str | None = None
+    last_error: str | None = None
+    episode_id: int | None = None
 
 
 class FactView(BaseModel):

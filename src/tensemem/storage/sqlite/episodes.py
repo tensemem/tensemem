@@ -45,5 +45,38 @@ def insert_episode(
     return int(row["id"]), public_id
 
 
+def set_episode_status(conn: sqlite3.Connection, episode_id: int, status: EpisodeStatus) -> None:
+    conn.execute("UPDATE episodes SET status = ? WHERE id = ?", (status.value, episode_id))
+
+
 def set_applied_seq(conn: sqlite3.Connection, scope_id: int, seq: int) -> None:
     conn.execute("UPDATE scopes SET applied_seq = ? WHERE id = ?", (seq, scope_id))
+
+
+def advance_watermark(conn: sqlite3.Connection, scope_id: int) -> int:
+    """Set ``applied_seq`` to the contiguous terminal prefix. Never decreases.
+
+    FAILED jobs stay off the watermark so a retry cannot sit behind a pending
+    episode. DISMISSED, PROCESSED, and SKIPPED count as terminal.
+    """
+    row = conn.execute(
+        """
+        SELECT MIN(id) AS n FROM episodes
+        WHERE scope_id = ? AND status IN ('PENDING', 'FAILED')
+        """,
+        (scope_id,),
+    ).fetchone()
+    if row["n"] is None:
+        latest = conn.execute(
+            "SELECT COALESCE(MAX(id), 0) AS n FROM episodes WHERE scope_id = ?",
+            (scope_id,),
+        ).fetchone()
+        seq = int(latest["n"])
+    else:
+        seq = int(row["n"]) - 1
+    current = conn.execute("SELECT applied_seq FROM scopes WHERE id = ?", (scope_id,)).fetchone()
+    applied = 0 if current is None else int(current["applied_seq"])
+    if seq > applied:
+        set_applied_seq(conn, scope_id, seq)
+        return seq
+    return applied

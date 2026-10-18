@@ -13,10 +13,14 @@ from tensemem.core.models import (
     AddResult,
     Cardinality,
     ContextResult,
+    EpisodeKind,
+    EpisodeStatus,
     ExplainResult,
     ExtractedOp,
     FactSet,
     FactSource,
+    JobKind,
+    JobView,
     Mutation,
     OnStale,
     OpKind,
@@ -49,6 +53,9 @@ from tensemem.storage.sqlite.facts import (
     mark_rejected,
     restore_displaced,
 )
+from tensemem.storage.sqlite.jobs import dismiss as dismiss_job
+from tensemem.storage.sqlite.jobs import enqueue, list_jobs
+from tensemem.storage.sqlite.jobs import retry as retry_job
 from tensemem.storage.sqlite.meta import get_fence_tag
 from tensemem.storage.sqlite.reads import forget_scope, read_explain, read_history, read_state
 from tensemem.storage.sqlite.registry import get_predicate, register_predicate
@@ -95,6 +102,61 @@ class Memory:
     def seed(self, ontology: Ontology) -> None:
         """Optionally load predicates and entities from an app-owned ontology."""
         self._db.seed(ontology)
+
+    def add(
+        self,
+        user_id: str,
+        content: str,
+        *,
+        agent_id: str = "",
+        namespace: str = "default",
+    ) -> AddResult:
+        """Store a user message and an extract job in one transaction. No worker yet."""
+        key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
+
+        def write(conn: sqlite3.Connection) -> AddResult:
+            now = self._db.now()
+            scope = get_or_create_scope(conn, key, now=now)
+            seq, public_id = insert_episode(
+                conn,
+                scope_id=scope.id,
+                content=content,
+                now=now,
+                kind=EpisodeKind.MESSAGE,
+                status=EpisodeStatus.PENDING,
+            )
+            job_id = enqueue(conn, kind=JobKind.EXTRACT, scope_id=scope.id, now=now, episode_id=seq)
+            return AddResult(seq=seq, episode_ids=(public_id,), job_id=str(job_id))
+
+        return self._db.transaction(write)
+
+    def jobs(
+        self,
+        user_id: str | None = None,
+        *,
+        agent_id: str = "",
+        namespace: str = "default",
+    ) -> tuple[JobView, ...]:
+        """List outbox rows, optionally for one scope."""
+        if user_id is None:
+            return self._db.read(lambda conn: list_jobs(conn))
+        key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
+
+        def load(conn: sqlite3.Connection) -> tuple[JobView, ...]:
+            scope = get_scope(conn, key)
+            if scope is None:
+                return ()
+            return list_jobs(conn, scope_id=scope.id)
+
+        return self._db.read(load)
+
+    def dismiss_job(self, job_id: str) -> JobView:
+        """Mark a DEAD job dismissed so later jobs in the scope can run."""
+        return self._db.transaction(lambda conn: dismiss_job(conn, job_id))
+
+    def retry_job(self, job_id: str) -> JobView:
+        """Requeue a DEAD job."""
+        return self._db.transaction(lambda conn: retry_job(conn, job_id, now=self._db.now()))
 
     def set(
         self,

@@ -14,4 +14,8 @@ class UnknownPredicateError(LookupError):
 
 
 class UnknownFactError(LookupError):
-    """No fact exists with that public id.""" ""
+    """No fact exists with that public id."""
+
+
+class UnknownJobError(LookupError):
+    """No job exists with that id."""
