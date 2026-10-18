@@ -1,8 +1,8 @@
 """Write resolver mutations into facts, edges, events, and rejected claims.
 
 Functions take a connection and never commit; callers own the transaction.
-``reject`` records the claim and marks the fact; re-resolving the slot so a
-superseded value can return to ACTIVE is a later slice (ADR 0008).
+``reject`` records the claim and marks the fact. ``correct()`` then calls
+``restore_displaced`` so a value that was only pushed aside can return to ACTIVE.
 """
 
 from __future__ import annotations
@@ -69,6 +69,99 @@ def apply_mutations(
 
 def get_fact(conn: sqlite3.Connection, public_id: str) -> sqlite3.Row | None:
     return conn.execute("SELECT * FROM facts WHERE public_id = ?", (public_id,)).fetchone()
+
+
+def mark_rejected(
+    conn: sqlite3.Connection,
+    fact: sqlite3.Row,
+    *,
+    episode_id: int,
+    recorded_seq: int,
+    now: str,
+    reason: str = "user_correction",
+) -> None:
+    """Mark a fact REJECTED and record the claim (ADR 0008). Allows SUPERSEDED facts."""
+    status = FactStatus(fact["status"])
+    if status in {FactStatus.REJECTED, FactStatus.DELETED}:
+        msg = f"fact {fact['public_id']!r} is already {status.value}"
+        raise ApplyError(msg)
+    conn.execute(
+        """
+        UPDATE facts
+        SET status = 'REJECTED', invalidated_at = ?
+        WHERE id = ?
+        """,
+        (now, fact["id"]),
+    )
+    conn.execute(
+        """
+        INSERT INTO rejected_claims (
+          scope_id, subject_id, predicate_id, object_norm, until_seq, episode_id, created_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            fact["scope_id"],
+            fact["subject_id"],
+            fact["predicate_id"],
+            fact["object_norm"],
+            recorded_seq,
+            episode_id,
+            now,
+        ),
+    )
+    _record_event(
+        conn,
+        int(fact["id"]),
+        from_status=status,
+        to_status=FactStatus.REJECTED,
+        reason=reason,
+        episode_id=episode_id,
+        at=now,
+    )
+
+
+def restore_displaced(
+    conn: sqlite3.Connection,
+    rejected_fact_id: int,
+    *,
+    episode_id: int,
+    now: str,
+) -> str | None:
+    """If the rejected fact superseded another, put that one back to ACTIVE."""
+    displaced = conn.execute(
+        """
+        SELECT * FROM facts
+        WHERE superseded_by = ? AND status = 'SUPERSEDED'
+        """,
+        (rejected_fact_id,),
+    ).fetchall()
+    restored: str | None = None
+    for row in displaced:
+        occupied = conn.execute(
+            "SELECT 1 FROM facts WHERE slot_key = ? AND status = 'ACTIVE'",
+            (row["slot_key"],),
+        ).fetchone()
+        if occupied is not None:
+            continue
+        conn.execute(
+            """
+            UPDATE facts
+            SET status = 'ACTIVE', valid_to = NULL, invalidated_at = NULL, superseded_by = NULL
+            WHERE id = ?
+            """,
+            (row["id"],),
+        )
+        _record_event(
+            conn,
+            int(row["id"]),
+            from_status=FactStatus.SUPERSEDED,
+            to_status=FactStatus.ACTIVE,
+            reason="restored_after_reject",
+            episode_id=episode_id,
+            at=now,
+        )
+        restored = str(row["public_id"])
+    return restored
 
 
 def _apply_one(

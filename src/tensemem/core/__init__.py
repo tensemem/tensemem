@@ -8,7 +8,12 @@ from tensemem.core.clock import (
     parse_instant,
     utc_now,
 )
-from tensemem.core.errors import ApplyError, RegistryConflictError
+from tensemem.core.errors import (
+    ApplyError,
+    RegistryConflictError,
+    UnknownFactError,
+    UnknownPredicateError,
+)
 from tensemem.core.ids import new_ulid, ulid_timestamp_ms
 from tensemem.core.models import (
     AddResult,
@@ -18,8 +23,11 @@ from tensemem.core.models import (
     EpisodeKind,
     EpisodeRole,
     EpisodeStatus,
+    ExplainResult,
     ExtractedOp,
     ExtractionResult,
+    FactEventView,
+    FactSet,
     FactSource,
     FactStatus,
     FactView,
@@ -60,8 +68,11 @@ __all__ = [
     "EpisodeKind",
     "EpisodeRole",
     "EpisodeStatus",
+    "ExplainResult",
     "ExtractedOp",
     "ExtractionResult",
+    "FactEventView",
+    "FactSet",
     "FactSnap",
     "FactSource",
     "FactStatus",
@@ -83,6 +94,8 @@ __all__ = [
     "ScopeKey",
     "Snapshot",
     "StaleMemoryError",
+    "UnknownFactError",
+    "UnknownPredicateError",
     "ValidPrecision",
     "ValueType",
     "format_instant",

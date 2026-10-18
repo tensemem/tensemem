@@ -69,6 +69,26 @@ def resolve_entity(conn: sqlite3.Connection, text: str, *, scope_id: int) -> int
     return _alias_target(conn, key, scope_id) or _alias_target(conn, key, None)
 
 
+def ensure_subject_entity(
+    conn: sqlite3.Connection, scope_id: int, subject: str, *, now: str
+) -> int:
+    """Resolve ``subject`` to an entity id, creating a scope-local one if needed."""
+    if normalize_value(subject) in {SELF_NAME, "self"}:
+        return ensure_self_entity(conn, scope_id, now=now)
+    found = resolve_entity(conn, subject, scope_id=scope_id)
+    if found is not None:
+        return found
+    row = conn.execute(
+        "SELECT id FROM entities WHERE scope_id = ? AND canonical_name = ?",
+        (scope_id, subject),
+    ).fetchone()
+    if row is not None:
+        return int(row["id"])
+    entity_id = _insert_entity(conn, subject, kind="thing", scope_id=scope_id, now=now)
+    add_entity_alias(conn, subject, entity_id, scope_id=scope_id)
+    return entity_id
+
+
 def _alias_target(conn: sqlite3.Connection, key: str, scope_id: int | None) -> int | None:
     # "IS" rather than "=" so a NULL scope matches global aliases.
     row = conn.execute(

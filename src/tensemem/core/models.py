@@ -206,6 +206,55 @@ class FactView(BaseModel):
     valid_precision: ValidPrecision = ValidPrecision.UNKNOWN
     recorded_at: str
     recorded_seq: int = Field(ge=0)
+    cardinality: Cardinality = Cardinality.ONE
+
+
+class FactEventView(BaseModel):
+    """One row from ``fact_events``, as returned by ``explain``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    from_status: FactStatus | None = None
+    to_status: FactStatus
+    reason: str
+    episode_id: int | None = None
+    at: str
+
+
+class FactSet(BaseModel):
+    """Facts plus the freshness of the snapshot they came from (ADR 0006)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    facts: tuple[FactView, ...] = ()
+    freshness: Freshness
+
+    @property
+    def values(self) -> dict[str, str | tuple[str, ...]]:
+        """Predicate → current value. MANY predicates always return a tuple."""
+        grouped: dict[str, list[str]] = {}
+        kinds: dict[str, Cardinality] = {}
+        for fact in self.facts:
+            grouped.setdefault(fact.predicate, []).append(fact.object)
+            kinds[fact.predicate] = fact.cardinality
+        out: dict[str, str | tuple[str, ...]] = {}
+        for name, objects in grouped.items():
+            if kinds[name] is Cardinality.MANY:
+                out[name] = tuple(sorted(objects, key=str.casefold))
+            else:
+                out[name] = objects[0]
+        return out
+
+
+class ExplainResult(BaseModel):
+    """Provenance for one fact."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    fact: FactView
+    events: tuple[FactEventView, ...] = ()
+    evidence_episode_ids: tuple[int, ...] = ()
+    superseded_by: str | None = None
 
 
 class OnStale(StrEnum):

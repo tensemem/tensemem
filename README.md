@@ -2,7 +2,7 @@
 
 **Memory that knows its tenses.** Embedded, deterministic memory that AI agents can safely act on.
 
-> Status: pre-alpha. Domain types, SQLite, scopes, the predicate registry, and a deterministic resolver are in place. Applying mutations to the database is next.
+> Status: pre-alpha. The deterministic API can set, correct, and read versioned facts. LLM extraction is next.
 
 ## The problem
 
@@ -19,18 +19,22 @@ Even memory that tracks changes usually can't tell you whether it's up to date, 
 - **The LLM proposes, the engine decides.** The model turns text into typed operations; deterministic, tested rules decide how state changes.
 - **No infrastructure.** A single SQLite file inside your process.
 
-## Planned API
+## API (deterministic, no LLM yet)
 
 ```python
 from tensemem import Memory
 
 mem = Memory()
-added = mem.add("I moved to Bangalore last week and now only write Rust.", user_id="u1")
+mem.register_predicate("lives_in")
+mem.set(user_id="u1", predicate="lives_in", value="Delhi")
+mem.set(user_id="u1", predicate="lives_in", value="Bangalore")
 
-ctx = mem.context(user_id="u1", max_tokens=200, min_seq=added.seq, wait=2.0)
-if ctx.is_current:
-    print(ctx.text)
+mem.state(user_id="u1").values  # {"lives_in": "Bangalore"}
+mem.history(user_id="u1", predicate="lives_in")
+mem.correct(wrong_fact_id)  # restores the value it displaced
 ```
+
+`mem.add(...)` / `mem.context(...)` come with the extraction pipeline.
 
 ## Contributing
 

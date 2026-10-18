@@ -7,3 +7,11 @@ class RegistryConflictError(ValueError):
 
 class ApplyError(RuntimeError):
     """A mutation could not be written without breaking a storage invariant."""
+
+
+class UnknownPredicateError(LookupError):
+    """The predicate is not in the registry."""
+
+
+class UnknownFactError(LookupError):
+    """No fact exists with that public id.""" ""
