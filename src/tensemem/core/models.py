@@ -6,6 +6,7 @@ modules; this file is the contract they share.
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from enum import StrEnum
 from typing import Literal
 
@@ -231,19 +232,36 @@ class FactSet(BaseModel):
 
     @property
     def values(self) -> dict[str, str | tuple[str, ...]]:
-        """Predicate → current value. MANY predicates always return a tuple."""
-        grouped: dict[str, list[str]] = {}
-        kinds: dict[str, Cardinality] = {}
+        """Current (ACTIVE) values for the self subject. MANY predicates return a tuple."""
+        return _values_for(
+            fact
+            for fact in self.facts
+            if fact.status is FactStatus.ACTIVE and fact.subject == "user"
+        )
+
+    @property
+    def by_subject(self) -> dict[str, dict[str, str | tuple[str, ...]]]:
+        """Current (ACTIVE) values keyed by subject, then predicate."""
+        subjects: dict[str, list[FactView]] = {}
         for fact in self.facts:
-            grouped.setdefault(fact.predicate, []).append(fact.object)
-            kinds[fact.predicate] = fact.cardinality
-        out: dict[str, str | tuple[str, ...]] = {}
-        for name, objects in grouped.items():
-            if kinds[name] is Cardinality.MANY:
-                out[name] = tuple(sorted(objects, key=str.casefold))
-            else:
-                out[name] = objects[0]
-        return out
+            if fact.status is FactStatus.ACTIVE:
+                subjects.setdefault(fact.subject, []).append(fact)
+        return {name: _values_for(group) for name, group in subjects.items()}
+
+
+def _values_for(facts: Iterable[FactView]) -> dict[str, str | tuple[str, ...]]:
+    grouped: dict[str, list[str]] = {}
+    kinds: dict[str, Cardinality] = {}
+    for fact in facts:
+        grouped.setdefault(fact.predicate, []).append(fact.object)
+        kinds[fact.predicate] = fact.cardinality
+    out: dict[str, str | tuple[str, ...]] = {}
+    for name, objects in grouped.items():
+        if kinds[name] is Cardinality.MANY:
+            out[name] = tuple(sorted(objects, key=str.casefold))
+        else:
+            out[name] = objects[0]
+    return out
 
 
 class ExplainResult(BaseModel):

@@ -30,8 +30,9 @@ mem.set(user_id="u1", predicate="lives_in", value="Delhi")
 mem.set(user_id="u1", predicate="lives_in", value="Bangalore")
 
 mem.state(user_id="u1").values  # {"lives_in": "Bangalore"}
-mem.history(user_id="u1", predicate="lives_in")
-mem.correct(wrong_fact_id)  # restores the value it displaced
+history = mem.history(user_id="u1", predicate="lives_in")
+bangalore = next(fact for fact in history.facts if fact.object == "Bangalore")
+mem.correct(bangalore.id)  # restores the value it displaced ("Delhi")
 ```
 
 `mem.add(...)` / `mem.context(...)` come with the extraction pipeline.

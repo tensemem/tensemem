@@ -89,6 +89,19 @@ def ensure_subject_entity(
     return entity_id
 
 
+def subject_label(conn: sqlite3.Connection, entity_id: int) -> str:
+    """Resolver-facing subject name: ``user`` for self, else canonical_name."""
+    row = conn.execute(
+        "SELECT kind, canonical_name FROM entities WHERE id = ?", (entity_id,)
+    ).fetchone()
+    if row is None:
+        msg = f"entity {entity_id} does not exist"
+        raise LookupError(msg)
+    if row["kind"] == "self":
+        return SELF_NAME
+    return str(row["canonical_name"])
+
+
 def _alias_target(conn: sqlite3.Connection, key: str, scope_id: int | None) -> int | None:
     # "IS" rather than "=" so a NULL scope matches global aliases.
     row = conn.execute(

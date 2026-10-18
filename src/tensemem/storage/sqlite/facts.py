@@ -138,10 +138,14 @@ def restore_displaced(
     restored: str | None = None
     for row in displaced:
         occupied = conn.execute(
-            "SELECT 1 FROM facts WHERE slot_key = ? AND status = 'ACTIVE'",
+            "SELECT id FROM facts WHERE slot_key = ? AND status = 'ACTIVE'",
             (row["slot_key"],),
         ).fetchone()
         if occupied is not None:
+            conn.execute(
+                "UPDATE facts SET superseded_by = ? WHERE id = ?",
+                (occupied["id"], row["id"]),
+            )
             continue
         conn.execute(
             """
@@ -509,6 +513,20 @@ def _add_edge(
     )
 
 
-def _index_fact(conn: sqlite3.Connection, fact_id: int, op: ExtractedOp) -> None:
-    text = " ".join((op.subject, op.predicate, op.object))
+def search_text(subject: str, predicate: str, object_text: str) -> str:
+    return " ".join((subject, predicate, object_text))
+
+
+def index_fact(conn: sqlite3.Connection, fact_id: int, text: str) -> None:
     conn.execute("INSERT INTO facts_fts(rowid, text) VALUES (?, ?)", (fact_id, text))
+
+
+def unindex_fact(conn: sqlite3.Connection, fact_id: int, text: str) -> None:
+    conn.execute(
+        "INSERT INTO facts_fts(facts_fts, rowid, text) VALUES ('delete', ?, ?)",
+        (fact_id, text),
+    )
+
+
+def _index_fact(conn: sqlite3.Connection, fact_id: int, op: ExtractedOp) -> None:
+    index_fact(conn, fact_id, search_text(op.subject, op.predicate, op.object))

@@ -11,6 +11,8 @@ from tensemem.core.models import (
     FactStatus,
     Scope,
 )
+from tensemem.storage.sqlite.entities import subject_label
+from tensemem.storage.sqlite.facts import search_text, unindex_fact
 from tensemem.storage.sqlite.snapshot import freshness_for, list_facts, to_fact_view
 
 _STATE_STATUSES = (FactStatus.ACTIVE,)
@@ -78,15 +80,22 @@ def read_explain(conn: sqlite3.Connection, row: sqlite3.Row) -> ExplainResult:
 
 def forget_scope(conn: sqlite3.Connection, scope_id: int) -> None:
     """Hard-delete a scope and the rows that belong to it."""
-    fact_ids = [
-        int(row["id"])
-        for row in conn.execute("SELECT id FROM facts WHERE scope_id = ?", (scope_id,)).fetchall()
-    ]
-    for fact_id in fact_ids:
-        conn.execute(
-            "INSERT INTO facts_fts(facts_fts, rowid) VALUES ('delete', ?)",
-            (fact_id,),
+    rows = conn.execute(
+        """
+        SELECT f.id, f.subject_id, f.object_text, p.name AS predicate
+        FROM facts f
+        JOIN predicates p ON p.id = f.predicate_id
+        WHERE f.scope_id = ?
+        """,
+        (scope_id,),
+    ).fetchall()
+    for row in rows:
+        text = search_text(
+            subject_label(conn, int(row["subject_id"])),
+            row["predicate"],
+            row["object_text"],
         )
+        unindex_fact(conn, int(row["id"]), text)
     conn.execute(
         """
         DELETE FROM fact_edges WHERE src_fact_id IN (

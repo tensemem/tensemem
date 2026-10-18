@@ -82,6 +82,42 @@ def test_scopes_do_not_share_state() -> None:
         assert mem.state(user_id="u2").values == {"lives_in": "Pune"}
 
 
+def test_named_subjects_are_separate_slots() -> None:
+    with _memory() as mem:
+        mem.register_predicate("lives_in")
+        mem.set(user_id="u1", predicate="lives_in", value="Delhi")
+        mem.set(user_id="u1", predicate="lives_in", value="Pune", subject="Alice")
+        mem.set(user_id="u1", predicate="lives_in", value="Mumbai", subject="alice")
+
+        state = mem.state(user_id="u1")
+        assert state.values == {"lives_in": "Delhi"}
+        assert state.by_subject == {
+            "user": {"lives_in": "Delhi"},
+            "Alice": {"lives_in": "Mumbai"},
+        }
+        history = mem.history(user_id="u1", predicate="lives_in")
+        assert history.values == {"lives_in": "Delhi"}
+        alice = [fact for fact in history.facts if fact.subject == "Alice"]
+        assert [fact.object for fact in alice] == ["Pune", "Mumbai"]
+        assert [fact.status for fact in alice] == [FactStatus.SUPERSEDED, FactStatus.ACTIVE]
+
+
+def test_correct_retargets_older_history_when_slot_is_occupied() -> None:
+    with _memory() as mem:
+        mem.register_predicate("lives_in")
+        mem.set(user_id="u1", predicate="lives_in", value="Delhi")
+        bangalore = mem.set(user_id="u1", predicate="lives_in", value="Bangalore")
+        pune = mem.set(user_id="u1", predicate="lives_in", value="Pune")
+        history = mem.history(user_id="u1", predicate="lives_in")
+        bangalore_id = next(fact.id for fact in history.facts if fact.object == "Bangalore")
+        pune_id = next(fact.id for fact in history.facts if fact.object == "Pune")
+        assert bangalore.seq < pune.seq
+
+        mem.correct(bangalore_id)
+        mem.correct(pune_id)
+        assert mem.state(user_id="u1").values == {"lives_in": "Delhi"}
+
+
 def test_forget_removes_the_scope() -> None:
     with _memory() as mem:
         mem.register_predicate("lives_in")

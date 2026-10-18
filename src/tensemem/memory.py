@@ -25,7 +25,12 @@ from tensemem.core.models import (
 from tensemem.core.normalize import normalize_key, normalize_value
 from tensemem.core.resolver import IncomingOp, resolve
 from tensemem.storage.sqlite import SqliteDatabase
-from tensemem.storage.sqlite.entities import SELF_NAME, ensure_subject_entity, resolve_entity
+from tensemem.storage.sqlite.entities import (
+    SELF_NAME,
+    ensure_subject_entity,
+    resolve_entity,
+    subject_label,
+)
 from tensemem.storage.sqlite.episodes import insert_episode, set_applied_seq
 from tensemem.storage.sqlite.facts import (
     ApplyContext,
@@ -310,6 +315,9 @@ def _prepare(
     if predicate is None:
         raise UnknownPredicateError(f"unknown predicate: {op.predicate}")
     subject_id = ensure_subject_entity(conn, scope.id, op.subject, now=now)
+    canonical = subject_label(conn, subject_id)
+    if op.subject != canonical:
+        op = op.model_copy(update={"subject": canonical})
     object_norm = normalize_value(op.object) if op.object.strip() else ""
     object_entity_id = None
     if op.object.strip():
