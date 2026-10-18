@@ -19,12 +19,12 @@ def test_normalize_fills_iso_date() -> None:
         assert incoming[0].op.valid_precision is ValidPrecision.DAY
 
 
-def test_normalize_falls_back_to_evidence_phrase() -> None:
+def test_normalize_parses_date_field_phrase() -> None:
     with _memory() as mem:
         mem.register_predicate("lives_in")
         incoming = mem.normalize(
             "u1",
-            (_op(object="Bangalore", evidence="I moved last week"),),
+            (_op(object="Bangalore", valid_from="last week", evidence="I moved last week"),),
             reference_time="2026-10-18",
         )
         assert incoming[0].op.valid_from == "2026-10-11T00:00:00.000000Z"

@@ -1,34 +1,20 @@
 """Resolve relative dates to valid time, and compare periods (ADR 0005).
 
 ISO strings are classified here so we know the precision (year / month / day /
-instant). English phrases go to ``dateparser``. Unknown dates use the episode
-reference time with precision ``unknown``.
+instant). English phrases go to ``dateparser`` and are stored as a day.
+Unknown dates use the episode reference time with precision ``unknown``.
 """
 
 from __future__ import annotations
 
-import re
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import dateparser
-from dateparser.search import search_dates
 from pydantic import BaseModel, ConfigDict
 
 from tensemem.core.clock import INSTANT_WIDTH, format_instant, parse_instant
 from tensemem.core.models import ValidPrecision
-
-_MONTH_ONLY = re.compile(
-    r"^(january|february|march|april|may|june|july|august|september|october|"
-    r"november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)$",
-    re.IGNORECASE,
-)
-_YEAR_PHRASE = re.compile(r"^(?:since|in|from)?\s*\d{4}$", re.IGNORECASE)
-_MONTH_WORD = re.compile(
-    r"\b(months?|january|february|march|april|may|june|july|august|september|"
-    r"october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec)\b",
-    re.IGNORECASE,
-)
 
 
 class ResolvedTime(BaseModel):
@@ -60,23 +46,22 @@ def resolve_valid_time(
 ) -> ResolvedTime:
     """Turn an extractor date or a phrase into storage-form valid time.
 
-    Order: ISO in ``value``, ``dateparser`` on ``value``, then ``dateparser``
-    search on ``evidence``. If nothing parses, use ``reference_time`` as
-    ``unknown``.
+    ``dateparser`` is only asked to parse the date field (or the evidence
+    string as a whole). It is not asked to hunt for dates inside a sentence.
     """
     ref = parse_reference_time(reference_time)
-    if value is not None and value.strip():
-        text = value.strip()
+    for candidate in (value, evidence):
+        if candidate is None:
+            continue
+        text = candidate.strip()
+        if not text:
+            continue
         iso = _try_iso(text)
         if iso is not None:
             return iso
-        parsed = _from_dateparser(text, ref, allow_month_only=True)
+        parsed = dateparser.parse(text, languages=["en"], settings=_settings(ref))
         if parsed is not None:
-            return parsed
-    if evidence.strip():
-        parsed = _from_dateparser(evidence, ref, allow_month_only=False)
-        if parsed is not None:
-            return parsed
+            return _as_day(parsed)
     return ResolvedTime(valid_from=format_instant(ref), valid_precision=ValidPrecision.UNKNOWN)
 
 
@@ -127,42 +112,9 @@ def _try_iso(text: str) -> ResolvedTime | None:
     return None
 
 
-def _from_dateparser(text: str, ref: datetime, *, allow_month_only: bool) -> ResolvedTime | None:
-    settings = _settings(ref)
-    parsed = dateparser.parse(text, languages=["en"], settings=settings)
-    if parsed is not None:
-        return _from_parsed(text, parsed)
-    found = search_dates(text, languages=["en"], settings=settings)
-    if not found:
-        return None
-    for match, instant in found:
-        if allow_month_only or not _MONTH_ONLY.fullmatch(match.strip()):
-            return _from_parsed(match, instant)
-    return None
-
-
-def _from_parsed(match: str, instant: datetime) -> ResolvedTime:
-    instant = instant.replace(tzinfo=UTC) if instant.tzinfo is None else instant.astimezone(UTC)
-    precision = _precision_from_match(match)
-    if precision is ValidPrecision.YEAR:
-        instant = datetime(instant.year, 1, 1, tzinfo=UTC)
-    elif precision is ValidPrecision.MONTH:
-        instant = datetime(instant.year, instant.month, 1, tzinfo=UTC)
-    elif precision is ValidPrecision.DAY:
-        instant = datetime(instant.year, instant.month, instant.day, tzinfo=UTC)
-    return _resolved(instant, precision)
-
-
-def _precision_from_match(text: str) -> ValidPrecision:
-    iso = _try_iso(text.strip())
-    if iso is not None:
-        return iso.valid_precision
-    folded = text.strip()
-    if _YEAR_PHRASE.fullmatch(folded):
-        return ValidPrecision.YEAR
-    if _MONTH_WORD.search(folded):
-        return ValidPrecision.MONTH
-    return ValidPrecision.DAY
+def _as_day(instant: datetime) -> ResolvedTime:
+    utc = instant.replace(tzinfo=UTC) if instant.tzinfo is None else instant.astimezone(UTC)
+    return _resolved(datetime(utc.year, utc.month, utc.day, tzinfo=UTC), ValidPrecision.DAY)
 
 
 def _settings(ref: datetime) -> dict[str, Any]:
