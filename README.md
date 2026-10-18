@@ -2,7 +2,7 @@
 
 **Memory that knows its tenses.** Embedded, deterministic memory that AI agents can safely act on.
 
-> Status: pre-alpha. The deterministic API can set facts and render fenced `context()` for prompts. LLM extraction is next.
+> Status: pre-alpha. The deterministic API can set facts and render fenced `context()`. LLM providers (`FakeExtractor`, OpenAI, Anthropic) are in; `add()` is next.
 
 ## The problem
 
@@ -38,7 +38,7 @@ ctx = mem.context(user_id="u1", max_tokens=200)
 print(ctx.text)  # fenced Markdown; ctx.freshness.is_current
 ```
 
-`mem.add(...)` (natural language) comes with the extraction pipeline.
+`mem.add(...)` (natural language) comes next. Providers live under `tensemem.providers.llm`; install `tensemem[openai]` or `tensemem[anthropic]` when you want a hosted model. Tests use `FakeExtractor`.
 
 ## Contributing
 
