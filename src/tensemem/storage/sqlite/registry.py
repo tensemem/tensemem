@@ -22,10 +22,12 @@ def register_predicate(
     """Register ``spec`` and its aliases. Re-registering the same definition is a no-op.
 
     Raises :class:`RegistryConflictError` if the name exists with a different
-    cardinality, or an alias already points at another predicate.
+    cardinality, the name is already an alias of another predicate, or an alias
+    already points at another predicate.
     """
     predicate = get_predicate_by_name(conn, spec.name)
     if predicate is None:
+        _reject_if_name_is_alias(conn, spec.name)
         predicate = _insert_predicate(conn, spec, now=now, builtin=builtin)
     elif predicate.cardinality is not spec.cardinality:
         msg = (
@@ -87,6 +89,16 @@ def get_predicate_by_name(conn: sqlite3.Connection, name: str) -> Predicate | No
 def list_predicates(conn: sqlite3.Connection) -> list[Predicate]:
     rows = conn.execute("SELECT * FROM predicates ORDER BY name").fetchall()
     return [_to_predicate(row) for row in rows]
+
+
+def _reject_if_name_is_alias(conn: sqlite3.Connection, name: str) -> None:
+    key = normalize_key(name)
+    row = conn.execute(
+        "SELECT predicate_id FROM predicate_aliases WHERE alias_norm = ?", (key,)
+    ).fetchone()
+    if row is not None:
+        msg = f"{name!r} is already an alias of another predicate"
+        raise RegistryConflictError(msg)
 
 
 def _insert_predicate(

@@ -1,5 +1,8 @@
 import sqlite3
 
+import pytest
+
+from tensemem.core.errors import RegistryConflictError
 from tensemem.core.models import Scope, ScopeKey
 from tensemem.storage.sqlite import SqliteDatabase
 from tensemem.storage.sqlite.entities import (
@@ -54,6 +57,17 @@ def test_global_entity_aliases_resolve_in_any_scope(db: SqliteDatabase) -> None:
 
     assert postgres == entity_id
     assert pg == entity_id
+
+
+def test_duplicate_global_entity_alias_is_rejected(db: SqliteDatabase) -> None:
+    def clash(conn: sqlite3.Connection) -> None:
+        a = ensure_global_entity(conn, "PostgreSQL", kind="tech", now=db.now())
+        b = ensure_global_entity(conn, "Python", kind="tech", now=db.now())
+        add_entity_alias(conn, "pg", a)
+        with pytest.raises(RegistryConflictError, match="already points"):
+            add_entity_alias(conn, "PG", b)
+
+    db.transaction(clash)
 
 
 def test_scope_alias_overrides_global(db: SqliteDatabase) -> None:

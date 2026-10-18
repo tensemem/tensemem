@@ -50,10 +50,14 @@ def add_entity_alias(
     key = normalize_value(alias)
     current = _alias_target(conn, key, scope_id)
     if current is None:
-        conn.execute(
-            "INSERT INTO entity_aliases(alias_norm, scope_id, entity_id) VALUES (?, ?, ?)",
-            (key, scope_id, entity_id),
-        )
+        try:
+            conn.execute(
+                "INSERT INTO entity_aliases(alias_norm, scope_id, entity_id) VALUES (?, ?, ?)",
+                (key, scope_id, entity_id),
+            )
+        except sqlite3.IntegrityError as exc:
+            msg = f"entity alias {alias!r} already points at another entity"
+            raise RegistryConflictError(msg) from exc
     elif current != entity_id:
         msg = f"entity alias {alias!r} already points at another entity"
         raise RegistryConflictError(msg)

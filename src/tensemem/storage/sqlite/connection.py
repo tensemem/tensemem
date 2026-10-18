@@ -56,14 +56,30 @@ def connect(
 
 @contextmanager
 def immediate_transaction(conn: sqlite3.Connection) -> Generator[sqlite3.Connection]:
-    """``BEGIN IMMEDIATE`` ... ``COMMIT``, rolling back if the block raises."""
+    """``BEGIN IMMEDIATE`` ... ``COMMIT``, rolling back on any failure.
+
+    A failed ``COMMIT`` also rolls back so the shared writer connection is not
+    left mid-transaction for the next caller.
+    """
     conn.execute("BEGIN IMMEDIATE")
     try:
         yield conn
     except BaseException:
-        conn.execute("ROLLBACK")
+        _rollback_quietly(conn)
         raise
-    conn.execute("COMMIT")
+    try:
+        conn.execute("COMMIT")
+    except BaseException:
+        _rollback_quietly(conn)
+        raise
+
+
+def _rollback_quietly(conn: sqlite3.Connection) -> None:
+    try:
+        if conn.in_transaction:
+            conn.execute("ROLLBACK")
+    except sqlite3.Error:
+        pass
 
 
 def apply_pragmas(conn: sqlite3.Connection, *, read_only: bool) -> None:
