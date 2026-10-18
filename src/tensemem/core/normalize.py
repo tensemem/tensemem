@@ -7,6 +7,7 @@ import unicodedata
 
 _NON_WORD = re.compile(r"[\W_]+")
 _WHITESPACE = re.compile(r"\s+")
+_LEADING_ARTICLE = re.compile(r"^(?:the|an|a)\s+", re.IGNORECASE)
 
 
 def normalize_key(text: str) -> str:
@@ -22,3 +23,8 @@ def normalize_value(text: str) -> str:
     """
     folded = unicodedata.normalize("NFKC", text).casefold()
     return _WHITESPACE.sub(" ", folded).strip()
+
+
+def strip_articles(text: str) -> str:
+    """Drop a leading English article: ``"the Bangalore"`` -> ``"Bangalore"``."""
+    return _LEADING_ARTICLE.sub("", text.strip())

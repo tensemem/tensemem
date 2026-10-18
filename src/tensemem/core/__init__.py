@@ -46,7 +46,7 @@ from tensemem.core.models import (
     ValidPrecision,
     ValueType,
 )
-from tensemem.core.normalize import normalize_key, normalize_value
+from tensemem.core.normalize import normalize_key, normalize_value, strip_articles
 from tensemem.core.ontology import EntitySpec, Ontology
 from tensemem.core.resolver import (
     FactSnap,
@@ -107,6 +107,7 @@ __all__ = [
     "parse_instant",
     "resolve",
     "slot_key",
+    "strip_articles",
     "ulid_timestamp_ms",
     "utc_now",
 ]

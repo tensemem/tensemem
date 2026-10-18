@@ -27,7 +27,9 @@ from tensemem.core.models import (
     StaleMemoryError,
 )
 from tensemem.core.normalize import normalize_key, normalize_value
+from tensemem.core.ontology import Ontology
 from tensemem.core.resolver import IncomingOp, resolve
+from tensemem.pipeline.normalize import normalize_ops
 from tensemem.pipeline.snapshot import ExtractSnapshot, load_extract_snapshot
 from tensemem.security.fence import strip as strip_fences
 from tensemem.security.fence import wrap as wrap_fence
@@ -88,6 +90,10 @@ class Memory:
             description=description,
         )
         return self._db.transaction(lambda conn: register_predicate(conn, spec, now=self._db.now()))
+
+    def seed(self, ontology: Ontology) -> None:
+        """Optionally load predicates and entities from an app-owned ontology."""
+        self._db.seed(ontology)
 
     def set(
         self,
@@ -200,6 +206,24 @@ class Memory:
         return self._db.read(
             lambda conn: load_extract_snapshot(conn, get_scope(conn, key), reference_time=as_of)
         )
+
+    def normalize(
+        self,
+        user_id: str,
+        ops: Sequence[ExtractedOp],
+        *,
+        agent_id: str = "",
+        namespace: str = "default",
+    ) -> tuple[IncomingOp, ...]:
+        """Map extractor ops onto registry names, aliases, and entities."""
+        key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
+
+        def write(conn: sqlite3.Connection) -> tuple[IncomingOp, ...]:
+            now = self._db.now()
+            scope = get_or_create_scope(conn, key, now=now)
+            return normalize_ops(conn, scope, ops, now=now)
+
+        return self._db.transaction(write)
 
     def context(
         self,

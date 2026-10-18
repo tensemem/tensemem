@@ -1,6 +1,6 @@
 import pytest
 
-from tensemem.core.normalize import normalize_key, normalize_value
+from tensemem.core.normalize import normalize_key, normalize_value, strip_articles
 
 
 @pytest.mark.parametrize(
@@ -27,3 +27,16 @@ def test_normalize_key(text: str, expected: str) -> None:
 )
 def test_normalize_value_keeps_punctuation(text: str, expected: str) -> None:
     assert normalize_value(text) == expected
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("the Bangalore", "Bangalore"),
+        ("an IDE", "IDE"),
+        ("a C++", "C++"),
+        ("Delhi", "Delhi"),
+    ],
+)
+def test_strip_articles(text: str, expected: str) -> None:
+    assert strip_articles(text) == expected
