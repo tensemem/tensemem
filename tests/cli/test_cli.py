@@ -73,3 +73,15 @@ def test_inspect_missing_database_does_not_create_one(
     err = capsys.readouterr().err
     assert "not found" in err
     assert not missing.exists()
+
+
+def test_bench_prints_pilot_metrics(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["bench", "--system", "tensemem"]) == 0
+    out = capsys.readouterr().out
+    assert "TenseBench v1" in out
+    assert "current_state_accuracy:" in out
+    assert "tensemem" in out
+    assert main(["--json", "bench", "--system", "tensemem"]) == 0
+    payload = capsys.readouterr().out
+    assert '"cases"' in payload
+    assert "tensemem" in payload

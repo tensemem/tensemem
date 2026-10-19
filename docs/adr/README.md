@@ -12,6 +12,7 @@ Each record captures one significant design decision: the context, what we chose
 | [0006](0006-versioned-freshness-aware-reads.md) | Every read reports how fresh it is | Accepted |
 | [0007](0007-self-contamination-guard.md) | Memory never learns from its own output | Accepted |
 | [0008](0008-corrections-are-first-class.md) | Corrections are first-class and survive rebuilds | Accepted |
+| [0009](0009-tensebench-safe-to-act.md) | TenseBench scores safe-to-act-on properties | Accepted |
 
 ## Template
 

@@ -64,7 +64,7 @@ path = "src/tensemem/__init__.py"
 packages = ["src/tensemem"]
 
 [tool.hatch.build.targets.sdist]
-include = ["src", "tests", "examples", "docs", "README.md", "LICENSE", "pyproject.toml", "mkdocs.yml"]
+include = ["src", "tests", "examples", "docs", "benchmarks", "README.md", "LICENSE", "pyproject.toml", "mkdocs.yml"]
 
 [tool.ruff]
 line-length = 100

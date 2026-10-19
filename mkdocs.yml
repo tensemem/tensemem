@@ -9,5 +9,6 @@ nav:
   - Concepts: concepts.md
   - API: api.md
   - CLI: cli.md
+  - TenseBench: tensebench.md
   - Operations: ops.md
   - Architecture decisions: adr/README.md

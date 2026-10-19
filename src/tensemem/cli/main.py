@@ -104,6 +104,17 @@ def _parser() -> argparse.ArgumentParser:
     stats = sub.add_parser("stats", help="counts and a rough token estimate")
     stats.add_argument("--user")
     stats.set_defaults(handler=_cmd_stats)
+
+    bench = sub.add_parser("bench", help="run TenseBench (no database required)")
+    bench.add_argument("--path", type=Path, default=None, help="JSONL scenarios")
+    bench.add_argument(
+        "--system",
+        action="append",
+        dest="systems",
+        choices=["tensemem", "concat", "similarity"],
+        help="repeat to choose systems (default: all)",
+    )
+    bench.set_defaults(handler=_cmd_bench)
     return parser
 
 
@@ -257,6 +268,17 @@ def _cmd_stats(args: argparse.Namespace) -> int:
             return 0
         print(_stats_text(stats))
         return 0
+
+
+def _cmd_bench(args: argparse.Namespace) -> int:
+    from tensemem.eval.tensebench import default_scenarios_path, format_report, run_suite
+
+    report = run_suite(args.path or default_scenarios_path(), systems=args.systems)
+    if args.json:
+        print(json.dumps(report.model_dump(mode="json"), indent=2))
+        return 0
+    print(format_report(report))
+    return 0
 
 
 def _print_facts(args: argparse.Namespace, payload: FactSet) -> int:

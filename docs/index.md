@@ -9,7 +9,8 @@ TenseMem stores raw messages as an append-only log and projects them into facts 
 - [Quickstart](quickstart.md) — three lines to a fenced `context()` block
 - [Concepts](concepts.md) — episodes, facts, freshness, fences, corrections
 - [Python API](api.md) — `Memory` and `AsyncMemory`
-- [CLI](cli.md) — inspect, history, explain, search, jobs
+- [CLI](cli.md) — inspect, history, explain, search, jobs, bench
+- [TenseBench](tensebench.md) — safe-to-act-on metrics
 - [Operations](ops.md) — backup, JSONL export, Litestream, migrations
 
 Local preview (optional): `uvx mkdocs serve`.
