@@ -57,11 +57,17 @@ def lease_next(
     *,
     now: str,
     lease_seconds: float = LEASE_SECONDS,
+    prefer_scope_id: int | None = None,
 ) -> JobView | None:
-    """Claim the next ready job, or None if the circuit is open or nothing is due."""
+    """Claim the next ready job, or None if the circuit is open or nothing is due.
+
+    ``prefer_scope_id`` still respects one-in-flight per scope; it only breaks
+    ties so a waiting reader can catch its own scope up first.
+    """
     if _circuit_open(conn, now):
         return None
     _expire_leases(conn, now)
+    prefer = -1 if prefer_scope_id is None else prefer_scope_id
     row = conn.execute(
         """
         SELECT j.id FROM jobs j
@@ -77,22 +83,41 @@ def lease_next(
               AND earlier.id < j.id
               AND earlier.status IN ('QUEUED', 'LEASED', 'DEAD')
           )
-        ORDER BY j.id
+        ORDER BY CASE WHEN j.scope_id = ? THEN 0 ELSE 1 END, j.id
         LIMIT 1
         """,
-        (now,),
+        (now, prefer),
     ).fetchone()
     if row is None:
         return None
-    until = _add_seconds(now, lease_seconds)
-    conn.execute(
-        "UPDATE jobs SET status = 'LEASED', lease_until = ? WHERE id = ?",
-        (until, int(row["id"])),
-    )
-    job = get_job(conn, str(row["id"]))
-    if job is None:
-        return None
-    return job
+    return _lease_row(conn, int(row["id"]), now=now, lease_seconds=lease_seconds)
+
+
+def lease_batch(
+    conn: sqlite3.Connection,
+    *,
+    now: str,
+    lease_seconds: float = LEASE_SECONDS,
+    prefer_scope_id: int | None = None,
+    limit: int = 8,
+) -> tuple[JobView, ...]:
+    """Lease the next ready job plus consecutive due extract jobs in that scope."""
+    if limit < 1:
+        return ()
+    first = lease_next(conn, now=now, lease_seconds=lease_seconds, prefer_scope_id=prefer_scope_id)
+    if first is None:
+        return ()
+    if first.kind is not JobKind.EXTRACT:
+        return (first,)
+    jobs = [first]
+    current = first
+    while len(jobs) < limit:
+        nxt = _lease_consecutive(conn, current, now=now, lease_seconds=lease_seconds)
+        if nxt is None:
+            break
+        jobs.append(nxt)
+        current = nxt
+    return tuple(jobs)
 
 
 def complete(
@@ -259,6 +284,45 @@ def record_provider_failure(conn: sqlite3.Connection, *, now: str) -> None:
 def _circuit_open(conn: sqlite3.Connection, now: str) -> bool:
     until = _meta_get(conn, _CIRCUIT_OPEN_UNTIL)
     return until is not None and until > now
+
+
+def _lease_consecutive(
+    conn: sqlite3.Connection,
+    held: JobView,
+    *,
+    now: str,
+    lease_seconds: float,
+) -> JobView | None:
+    """Lease the next due extract job in ``held``'s scope, or None at a gap."""
+    row = conn.execute(
+        """
+        SELECT id, kind, status, next_run_at FROM jobs
+        WHERE scope_id = ? AND id > ? AND status IN ('QUEUED', 'LEASED', 'DEAD')
+        ORDER BY id
+        LIMIT 1
+        """,
+        (held.scope_id, int(held.id)),
+    ).fetchone()
+    if row is None:
+        return None
+    if (
+        str(row["status"]) != JobStatus.QUEUED.value
+        or str(row["kind"]) != JobKind.EXTRACT.value
+        or str(row["next_run_at"]) > now
+    ):
+        return None
+    return _lease_row(conn, int(row["id"]), now=now, lease_seconds=lease_seconds)
+
+
+def _lease_row(
+    conn: sqlite3.Connection, job_id: int, *, now: str, lease_seconds: float
+) -> JobView | None:
+    until = _add_seconds(now, lease_seconds)
+    conn.execute(
+        "UPDATE jobs SET status = 'LEASED', lease_until = ? WHERE id = ?",
+        (until, job_id),
+    )
+    return get_job(conn, str(job_id))
 
 
 def _expire_leases(conn: sqlite3.Connection, now: str) -> None:

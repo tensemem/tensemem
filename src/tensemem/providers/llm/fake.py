@@ -67,8 +67,7 @@ def _as_schema(value: BaseModel, schema: type[T]) -> T:
 
 def _rule_extract(text: str) -> ExtractionResult:
     ops: list[ExtractedOp] = []
-    city = _CITY.search(text)
-    if city is not None:
+    for city in _CITY.finditer(text):
         ops.append(
             ExtractedOp(
                 subject="user",

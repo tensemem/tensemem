@@ -27,6 +27,7 @@ from tensemem.storage.sqlite.jobs import (
     fail,
     get_job,
     has_due_or_leased,
+    lease_batch,
     lease_next,
     retry,
 )
@@ -63,6 +64,27 @@ def test_one_lease_per_scope_and_in_order(db: SqliteDatabase) -> None:
     nxt = db.transaction(lambda conn: lease_next(conn, now=db.now()))
     assert nxt is not None
     assert nxt.id == str(second["job_id"])
+
+
+def test_lease_prefers_a_waiting_scope(db: SqliteDatabase) -> None:
+    first = _ingest(db, "u1", "one")
+    second = _ingest(db, "u2", "two")
+    preferred = db.transaction(
+        lambda conn: lease_next(conn, now=db.now(), prefer_scope_id=second["scope_id"])
+    )
+    assert preferred is not None
+    assert preferred.id == str(second["job_id"])
+    other = db.transaction(lambda conn: lease_next(conn, now=db.now()))
+    assert other is not None
+    assert other.id == str(first["job_id"])
+
+
+def test_lease_batch_takes_consecutive_jobs_in_one_scope(db: SqliteDatabase) -> None:
+    first = _ingest(db, "u1", "one")
+    second = _ingest(db, "u1", "two")
+    _ingest(db, "u2", "other")
+    batch = db.transaction(lambda conn: lease_batch(conn, now=db.now(), limit=8))
+    assert [job.id for job in batch] == [str(first["job_id"]), str(second["job_id"])]
 
 
 def test_expired_lease_can_be_reclaimed(db: SqliteDatabase) -> None:

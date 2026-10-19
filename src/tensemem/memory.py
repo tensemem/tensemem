@@ -1,11 +1,13 @@
-"""Sync Memory API: typed writes plus optional extract worker (design §12.1)."""
+"""Sync and async Memory API: typed writes plus optional extract worker (design §12.1)."""
 
 from __future__ import annotations
 
+import asyncio
 import sqlite3
 import threading
 import time
 from collections.abc import Sequence
+from contextlib import suppress
 from pathlib import Path
 
 from tensemem.core.clock import Clock, utc_now
@@ -21,6 +23,7 @@ from tensemem.core.models import (
     ExtractedOp,
     FactSet,
     FactSource,
+    Freshness,
     JobKind,
     JobStatus,
     JobView,
@@ -39,7 +42,7 @@ from tensemem.core.resolver import IncomingOp, resolve
 from tensemem.pipeline.normalize import normalize_ops
 from tensemem.pipeline.policy import apply_policy
 from tensemem.pipeline.snapshot import ExtractSnapshot, load_extract_snapshot
-from tensemem.pipeline.worker import process_one
+from tensemem.pipeline.worker import EXTRACT_BATCH, process_one
 from tensemem.providers.llm.base import LLMProvider
 from tensemem.security.fence import strip as strip_fences
 from tensemem.security.fence import wrap as wrap_fence
@@ -79,13 +82,16 @@ class Memory:
         *,
         clock: Clock = utc_now,
         llm: LLMProvider | None = None,
+        batch_size: int = EXTRACT_BATCH,
+        start_worker: bool = True,
     ) -> None:
         self._db = SqliteDatabase(path, clock=clock)
         self._llm = llm
+        self._batch_size = batch_size
         self._stop = threading.Event()
         self._wake = threading.Event()
         self._worker: threading.Thread | None = None
-        if llm is not None:
+        if llm is not None and start_worker:
             self._worker = threading.Thread(
                 target=self._run_worker,
                 name="tensemem-extract-worker",
@@ -93,9 +99,19 @@ class Memory:
             )
             self._worker.start()
 
-    def close(self) -> None:
+    def halt(self) -> None:
+        """Stop the extract loop. Does not close the database."""
         self._stop.set()
         self._wake.set()
+
+    def has_provider(self) -> bool:
+        return self._llm is not None
+
+    def stopped(self) -> bool:
+        return self._stop.is_set()
+
+    def close(self) -> None:
+        self.halt()
         if self._worker is not None:
             self._worker.join()
             self._worker = None
@@ -172,31 +188,32 @@ class Memory:
         Pass ``job_id`` to return as soon as that job leaves QUEUED/LEASED, even
         if another scope still has work.
         """
-        if not self._waiting(job_id):
+        if not self.waiting_for(job_id):
             return
         if self._llm is None:
             msg = "flush() needs Memory(..., llm=...)"
             raise RuntimeError(msg)
+        prefer = self.scope_for_job(job_id) if job_id is not None else None
         deadline = time.monotonic() + timeout
         while True:
-            if job_id is not None and not self._waiting(job_id):
+            if job_id is not None and not self.waiting_for(job_id):
                 return
-            if process_one(self._db, self._llm):
+            if self.process_extract(prefer_scope_id=prefer):
                 if time.monotonic() >= deadline:
                     break
                 continue
-            if not self._waiting(job_id):
+            if not self.waiting_for(job_id):
                 return
             if time.monotonic() >= deadline:
                 break
             remaining = deadline - time.monotonic()
             self._wake.wait(timeout=min(_WORKER_IDLE, max(remaining, 0.0)))
             self._wake.clear()
-        if self._waiting(job_id):
+        if self.waiting_for(job_id):
             msg = f"extract jobs still pending after {timeout}s"
             raise TimeoutError(msg)
 
-    def _waiting(self, job_id: str | None) -> bool:
+    def waiting_for(self, job_id: str | None) -> bool:
         if job_id is None:
             return self._has_work()
         return self._job_pending(job_id)
@@ -213,13 +230,27 @@ class Memory:
 
         return self._db.write(pending)
 
-    def _run_worker(self) -> None:
+    def scope_for_job(self, job_id: str) -> int | None:
+        job = self._db.write(lambda conn: get_job(conn, job_id))
+        return None if job is None else job.scope_id
+
+    def process_extract(self, *, prefer_scope_id: int | None = None) -> bool:
         provider = self._llm
         if provider is None:
+            return False
+        return process_one(
+            self._db,
+            provider,
+            prefer_scope_id=prefer_scope_id,
+            batch_size=self._batch_size,
+        )
+
+    def _run_worker(self) -> None:
+        if self._llm is None:
             return
         while not self._stop.is_set():
             try:
-                worked = process_one(self._db, provider)
+                worked = self.process_extract()
             except Exception as extra:
                 if self._stop.is_set() or (
                     isinstance(extra, RuntimeError) and "is closed" in str(extra)
@@ -398,41 +429,88 @@ class Memory:
         *,
         max_tokens: int = 300,
         min_seq: int | None = None,
+        wait: float = 0.0,
         on_stale: OnStale | str = OnStale.FLAG,
         fence: bool = True,
         agent_id: str = "",
         namespace: str = "default",
     ) -> ContextResult:
-        """Render current facts for a prompt. Does not wait for the extract worker."""
-        key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
-        as_of = self._db.now()[:10]
-        policy = OnStale(on_stale)
+        """Render current facts for a prompt.
 
-        def load(conn: sqlite3.Connection) -> ContextResult:
-            facts = read_state(conn, get_scope(conn, key))
-            if (
-                min_seq is not None
-                and facts.freshness.as_of_seq < min_seq
-                and policy is OnStale.RAISE
-            ):
-                raise StaleMemoryError(min_seq=min_seq, freshness=facts.freshness)
+        With ``wait>0``, drain this scope's extract jobs until ``min_seq`` is
+        applied (or until the scope is current when ``min_seq`` is omitted).
+        """
+        key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
+        policy = OnStale(on_stale)
+        packed, scope_id = self.pack_context(key, query=query, max_tokens=max_tokens, fence=fence)
+        if caught_up(packed.freshness, min_seq):
+            return packed
+        if wait <= 0:
+            return stale_or_raise(packed, min_seq=min_seq, policy=policy)
+        if self._llm is None:
+            msg = "context(wait=...) needs Memory(..., llm=...)"
+            raise RuntimeError(msg)
+        self._wake.set()
+        deadline = time.monotonic() + wait
+        while time.monotonic() < deadline:
+            if self.process_extract(prefer_scope_id=scope_id):
+                packed, scope_id = self.pack_context(
+                    key, query=query, max_tokens=max_tokens, fence=fence
+                )
+                if caught_up(packed.freshness, min_seq):
+                    return packed
+                continue
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            self._wake.wait(timeout=min(_WORKER_IDLE, remaining))
+            self._wake.clear()
+            packed, scope_id = self.pack_context(
+                key, query=query, max_tokens=max_tokens, fence=fence
+            )
+            if caught_up(packed.freshness, min_seq):
+                return packed
+        packed, _ = self.pack_context(key, query=query, max_tokens=max_tokens, fence=fence)
+        if caught_up(packed.freshness, min_seq):
+            return packed
+        return stale_or_raise(packed, min_seq=min_seq, policy=policy)
+
+    def pack_context(
+        self,
+        key: ScopeKey,
+        *,
+        query: str,
+        max_tokens: int,
+        fence: bool,
+    ) -> tuple[ContextResult, int | None]:
+        as_of = self._db.now()[:10]
+
+        def load(conn: sqlite3.Connection) -> tuple[ContextResult, int | None]:
+            scope = get_scope(conn, key)
+            facts = read_state(conn, scope)
             tag = get_fence_tag(conn) or ""
             reserve = count_tokens(wrap_fence("", tag)) if fence else 0
             if fence and reserve > max_tokens:
-                return ContextResult(
-                    text="",
-                    facts_used=(),
-                    token_count=0,
-                    freshness=facts.freshness,
+                return (
+                    ContextResult(
+                        text="",
+                        facts_used=(),
+                        token_count=0,
+                        freshness=facts.freshness,
+                    ),
+                    None if scope is None else scope.id,
                 )
             body_budget = max(max_tokens - reserve, 0)
             body, ids = pack_facts(facts.facts, as_of=as_of, max_tokens=body_budget, query=query)
             text = wrap_fence(body, tag) if fence else body
-            return ContextResult(
-                text=text,
-                facts_used=ids,
-                token_count=count_tokens(text),
-                freshness=facts.freshness,
+            return (
+                ContextResult(
+                    text=text,
+                    facts_used=ids,
+                    token_count=count_tokens(text),
+                    freshness=facts.freshness,
+                ),
+                None if scope is None else scope.id,
             )
 
         return self._db.read(load)
@@ -536,6 +614,19 @@ class Memory:
         return self._db.transaction(write)
 
 
+def caught_up(freshness: Freshness, min_seq: int | None) -> bool:
+    if min_seq is not None:
+        return freshness.as_of_seq >= min_seq
+    return freshness.is_current
+
+
+def stale_or_raise(packed: ContextResult, *, min_seq: int | None, policy: OnStale) -> ContextResult:
+    if policy is OnStale.RAISE:
+        needed = packed.freshness.latest_seq if min_seq is None else min_seq
+        raise StaleMemoryError(min_seq=needed, freshness=packed.freshness)
+    return packed
+
+
 def _apply_ops(
     conn: sqlite3.Connection,
     scope: Scope,
@@ -618,3 +709,254 @@ def _context_for(
         if item.op.predicate == mutation.op.predicate and item.op.subject == mutation.op.subject:
             return ctx
     return contexts[0]
+
+
+class AsyncMemory:
+    """Async handle. Extract work runs on an ``asyncio`` task via the writer thread."""
+
+    def __init__(
+        self,
+        path: str | Path = "tensemem.db",
+        *,
+        clock: Clock = utc_now,
+        llm: LLMProvider | None = None,
+        batch_size: int = EXTRACT_BATCH,
+    ) -> None:
+        self._sync = Memory(path, clock=clock, llm=llm, batch_size=batch_size, start_worker=False)
+        self._task: asyncio.Task[None] | None = None
+        self._wake = asyncio.Event()
+
+    async def __aenter__(self) -> AsyncMemory:
+        self._ensure_worker()
+        return self
+
+    async def __aexit__(self, *exc: object) -> None:
+        await self.close()
+
+    async def close(self) -> None:
+        self._sync.halt()
+        self._wake.set()
+        if self._task is not None:
+            self._task.cancel()
+            with suppress(asyncio.CancelledError):
+                await self._task
+            self._task = None
+        await asyncio.to_thread(self._sync.close)
+
+    def _ensure_worker(self) -> None:
+        if self._task is not None or not self._sync.has_provider():
+            return
+        self._task = asyncio.get_running_loop().create_task(self._run_worker())
+
+    async def _run_worker(self) -> None:
+        while not self._sync.stopped():
+            try:
+                worked = await asyncio.to_thread(self._sync.process_extract)
+            except Exception as extra:
+                if self._sync.stopped() or (
+                    isinstance(extra, RuntimeError) and "is closed" in str(extra)
+                ):
+                    return
+                worked = False
+            if worked:
+                continue
+            with suppress(TimeoutError):
+                await asyncio.wait_for(self._wake.wait(), timeout=_WORKER_IDLE)
+            self._wake.clear()
+
+    async def register_predicate(
+        self,
+        name: str,
+        *,
+        cardinality: Cardinality = Cardinality.ONE,
+        aliases: Sequence[str] = (),
+        description: str = "",
+    ) -> Predicate:
+        return await asyncio.to_thread(
+            self._sync.register_predicate,
+            name,
+            cardinality=cardinality,
+            aliases=aliases,
+            description=description,
+        )
+
+    async def seed(self, ontology: Ontology) -> None:
+        await asyncio.to_thread(self._sync.seed, ontology)
+
+    async def add(
+        self,
+        user_id: str,
+        content: str,
+        *,
+        agent_id: str = "",
+        namespace: str = "default",
+        wait: bool = False,
+        timeout: float = 10.0,
+    ) -> AddResult:
+        if wait and not self._sync.has_provider():
+            msg = "add(wait=True) needs AsyncMemory(..., llm=...)"
+            raise RuntimeError(msg)
+        self._ensure_worker()
+        result = await asyncio.to_thread(
+            self._sync.add,
+            user_id,
+            content,
+            agent_id=agent_id,
+            namespace=namespace,
+            wait=False,
+        )
+        self._wake.set()
+        if wait:
+            await self.flush(timeout=timeout, job_id=result.job_id)
+        return result
+
+    async def flush(self, timeout: float = 10.0, *, job_id: str | None = None) -> None:
+        if not await asyncio.to_thread(self._sync.waiting_for, job_id):
+            return
+        if not self._sync.has_provider():
+            msg = "flush() needs AsyncMemory(..., llm=...)"
+            raise RuntimeError(msg)
+        self._ensure_worker()
+        prefer = (
+            None if job_id is None else await asyncio.to_thread(self._sync.scope_for_job, job_id)
+        )
+        deadline = time.monotonic() + timeout
+        while True:
+            if job_id is not None and not await asyncio.to_thread(self._sync.waiting_for, job_id):
+                return
+            if await asyncio.to_thread(self._sync.process_extract, prefer_scope_id=prefer):
+                if time.monotonic() >= deadline:
+                    break
+                continue
+            if not await asyncio.to_thread(self._sync.waiting_for, job_id):
+                return
+            if time.monotonic() >= deadline:
+                break
+            remaining = deadline - time.monotonic()
+            await asyncio.sleep(min(_WORKER_IDLE, max(remaining, 0.0)))
+        if await asyncio.to_thread(self._sync.waiting_for, job_id):
+            msg = f"extract jobs still pending after {timeout}s"
+            raise TimeoutError(msg)
+
+    async def context(
+        self,
+        user_id: str,
+        query: str = "",
+        *,
+        max_tokens: int = 300,
+        min_seq: int | None = None,
+        wait: float = 0.0,
+        on_stale: OnStale | str = OnStale.FLAG,
+        fence: bool = True,
+        agent_id: str = "",
+        namespace: str = "default",
+    ) -> ContextResult:
+        key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
+        policy = OnStale(on_stale)
+        packed, scope_id = await asyncio.to_thread(
+            self._sync.pack_context, key, query=query, max_tokens=max_tokens, fence=fence
+        )
+        if caught_up(packed.freshness, min_seq):
+            return packed
+        if wait <= 0:
+            return stale_or_raise(packed, min_seq=min_seq, policy=policy)
+        if not self._sync.has_provider():
+            msg = "context(wait=...) needs AsyncMemory(..., llm=...)"
+            raise RuntimeError(msg)
+        self._ensure_worker()
+        self._wake.set()
+        deadline = time.monotonic() + wait
+        while time.monotonic() < deadline:
+            if await asyncio.to_thread(self._sync.process_extract, prefer_scope_id=scope_id):
+                packed, scope_id = await asyncio.to_thread(
+                    self._sync.pack_context,
+                    key,
+                    query=query,
+                    max_tokens=max_tokens,
+                    fence=fence,
+                )
+                if caught_up(packed.freshness, min_seq):
+                    return packed
+                continue
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                break
+            await asyncio.sleep(min(_WORKER_IDLE, remaining))
+            packed, scope_id = await asyncio.to_thread(
+                self._sync.pack_context, key, query=query, max_tokens=max_tokens, fence=fence
+            )
+            if caught_up(packed.freshness, min_seq):
+                return packed
+        packed, _ = await asyncio.to_thread(
+            self._sync.pack_context, key, query=query, max_tokens=max_tokens, fence=fence
+        )
+        if caught_up(packed.freshness, min_seq):
+            return packed
+        return stale_or_raise(packed, min_seq=min_seq, policy=policy)
+
+    async def set(
+        self,
+        user_id: str,
+        predicate: str,
+        value: str,
+        *,
+        agent_id: str = "",
+        namespace: str = "default",
+        subject: str = SELF_NAME,
+    ) -> AddResult:
+        return await asyncio.to_thread(
+            self._sync.set,
+            user_id,
+            predicate,
+            value,
+            agent_id=agent_id,
+            namespace=namespace,
+            subject=subject,
+        )
+
+    async def state(
+        self,
+        user_id: str,
+        *,
+        agent_id: str = "",
+        namespace: str = "default",
+    ) -> FactSet:
+        return await asyncio.to_thread(
+            self._sync.state, user_id, agent_id=agent_id, namespace=namespace
+        )
+
+    async def history(
+        self,
+        user_id: str,
+        predicate: str | None = None,
+        *,
+        agent_id: str = "",
+        namespace: str = "default",
+    ) -> FactSet:
+        return await asyncio.to_thread(
+            self._sync.history,
+            user_id,
+            predicate,
+            agent_id=agent_id,
+            namespace=namespace,
+        )
+
+    async def jobs(
+        self,
+        user_id: str | None = None,
+        *,
+        agent_id: str = "",
+        namespace: str = "default",
+    ) -> tuple[JobView, ...]:
+        return await asyncio.to_thread(
+            self._sync.jobs, user_id, agent_id=agent_id, namespace=namespace
+        )
+
+    async def explain(self, fact_id: str) -> ExplainResult:
+        return await asyncio.to_thread(self._sync.explain, fact_id)
+
+    async def fence(self, text: str) -> str:
+        return await asyncio.to_thread(self._sync.fence, text)
+
+    async def unfence(self, text: str) -> str:
+        return await asyncio.to_thread(self._sync.unfence, text)

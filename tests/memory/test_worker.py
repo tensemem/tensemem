@@ -115,6 +115,18 @@ def test_add_wait_does_not_block_on_another_scope() -> None:
             hold.set()
 
 
+def test_queued_messages_extract_in_one_call() -> None:
+    fake = FakeExtractor()
+    with Memory(":memory:", clock=_clock(), llm=fake, start_worker=False) as mem:
+        mem.register_predicate("lives_in")
+        mem.add("u1", "I live in Delhi")
+        mem.add("u1", "I moved to Bangalore")
+        mem.flush()
+        assert len(fake.calls) == 1
+        assert mem.state("u1").values == {"lives_in": "Bangalore"}
+        assert all(job.status is JobStatus.DONE for job in mem.jobs("u1"))
+
+
 def test_language_replace_set() -> None:
     with _memory() as mem:
         mem.register_predicate("lives_in")

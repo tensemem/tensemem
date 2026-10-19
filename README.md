@@ -2,7 +2,7 @@
 
 **Memory that knows its tenses.** Embedded, deterministic memory that AI agents can safely act on.
 
-> Status: pre-alpha. The deterministic API can set facts and render fenced `context()`. `add()` plus `flush()` (or `wait=True`) runs extract jobs through `FakeExtractor` or any `LLMProvider`.
+> Status: pre-alpha. The deterministic API can set facts and render fenced `context()`. `add()` plus `flush()`, `add(..., wait=True)`, or `context(..., wait=)` runs extract jobs through `FakeExtractor` or any `LLMProvider`. `AsyncMemory` mirrors the sync API.
 
 ## The problem
 
@@ -26,7 +26,8 @@ from tensemem import FakeExtractor, Memory
 
 mem = Memory(llm=FakeExtractor())
 mem.register_predicate("lives_in")
-mem.add("u1", "I live in Delhi", wait=True)
+added = mem.add("u1", "I live in Delhi")
+ctx = mem.context(user_id="u1", min_seq=added.seq, wait=1.5)
 mem.state(user_id="u1").values  # {"lives_in": "Delhi"}
 
 mem.set(user_id="u1", predicate="lives_in", value="Bangalore")
@@ -38,7 +39,7 @@ ctx = mem.context(user_id="u1", max_tokens=200)
 print(ctx.text)  # fenced Markdown; ctx.freshness.is_current
 ```
 
-`mem.add(user_id, text)` writes the episode and an extract job in one transaction. Pass `llm=` to process jobs on a background thread; `flush()` or `add(..., wait=True)` waits until due jobs finish. Recalled `context()` blocks are stripped before extract; operations whose evidence is not a verbatim quote from the remaining user text are dropped. Empty leftover messages are skipped without an LLM call. Dead jobs can be dismissed or retried. Tests use `FakeExtractor`.
+`mem.add(user_id, text)` writes the episode and an extract job in one transaction. Pass `llm=` to process jobs on a background thread (`AsyncMemory` uses an asyncio task). `flush()`, `add(..., wait=True)`, or `context(..., wait=seconds)` wait until due jobs finish, preferring that scope. Consecutive queued messages in one scope share one extract call. Recalled `context()` blocks are stripped before extract; operations whose evidence is not a verbatim quote from the remaining user text are dropped. Empty leftover messages are skipped without an LLM call. Dead jobs can be dismissed or retried. Tests use `FakeExtractor`.
 
 ## Contributing
 

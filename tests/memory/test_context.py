@@ -1,10 +1,16 @@
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
+from typing import Any, TypeVar
 
 import pytest
+from pydantic import BaseModel
 
-from tensemem import Memory
+from tensemem import FakeExtractor, Memory
 from tensemem.core.clock import FrozenClock
 from tensemem.core.models import Cardinality, StaleMemoryError
+from tensemem.providers.llm.base import LLMProvider, ProviderError
+
+T = TypeVar("T", bound=BaseModel)
 
 
 def test_context_is_fenced_and_fresh() -> None:
@@ -41,6 +47,23 @@ def test_context_query_and_token_budget() -> None:
         assert tiny.token_count == 0
 
 
+def test_context_wait_applies_the_message() -> None:
+    with _memory(llm=FakeExtractor()) as mem:
+        mem.register_predicate("lives_in")
+        added = mem.add("u1", "I live in Delhi")
+        ctx = mem.context("u1", min_seq=added.seq, wait=2.0)
+        assert ctx.freshness.as_of_seq >= added.seq
+        assert "Delhi" in ctx.text
+
+
+def test_context_wait_times_out_and_raises() -> None:
+    with _memory(llm=_Boom()) as mem:
+        mem.register_predicate("lives_in")
+        added = mem.add("u1", "I live in Delhi")
+        with pytest.raises(StaleMemoryError):
+            mem.context("u1", min_seq=added.seq, wait=0.2, on_stale="raise")
+
+
 def test_min_seq_raise_and_custom_fence() -> None:
     with _memory() as mem:
         mem.register_predicate("lives_in")
@@ -56,6 +79,19 @@ def test_min_seq_raise_and_custom_fence() -> None:
         assert "hello" not in mem.unfence(custom)
 
 
-def _memory() -> Memory:
+class _Boom:
+    model = "boom"
+
+    def structured(
+        self,
+        messages: Sequence[Mapping[str, str]],
+        schema: type[T],
+        **kwargs: Any,
+    ) -> T:
+        del messages, schema, kwargs
+        raise ProviderError("down")
+
+
+def _memory(*, llm: LLMProvider | None = None) -> Memory:
     clock = FrozenClock(datetime(2026, 10, 18, 11, 0, 0, tzinfo=UTC))
-    return Memory(":memory:", clock=clock)
+    return Memory(":memory:", clock=clock, llm=llm)
