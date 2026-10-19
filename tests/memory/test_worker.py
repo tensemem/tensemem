@@ -1,3 +1,4 @@
+import threading
 from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 from typing import Any, TypeVar
@@ -8,7 +9,7 @@ from pydantic import BaseModel
 from tensemem import FakeExtractor, Memory
 from tensemem.core.clock import FrozenClock
 from tensemem.core.models import Cardinality, JobStatus
-from tensemem.providers.llm.base import LLMProvider, ProviderError
+from tensemem.providers.llm.base import LLMProvider, ProviderError, last_user_text
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -82,6 +83,36 @@ def test_flush_without_provider_raises_when_jobs_exist() -> None:
 def test_flush_is_noop_when_the_queue_is_idle() -> None:
     with Memory(":memory:", clock=_clock()) as mem:
         mem.flush()
+
+
+def test_add_wait_does_not_block_on_another_scope() -> None:
+    hold = threading.Event()
+    started = threading.Event()
+
+    class Gated:
+        model = "gated"
+
+        def structured(
+            self,
+            messages: Sequence[Mapping[str, str]],
+            schema: type[T],
+            **kwargs: Any,
+        ) -> T:
+            if "hold" in last_user_text(messages):
+                started.set()
+                assert hold.wait(timeout=5)
+            inner = FakeExtractor()
+            return inner.structured(messages, schema, **kwargs)
+
+    with Memory(":memory:", clock=_clock(), llm=Gated()) as mem:
+        mem.register_predicate("lives_in")
+        try:
+            mem.add("u2", "please hold, I live in Delhi")
+            assert started.wait(timeout=5)
+            mem.add("u1", "I live in Delhi", wait=True)
+            assert mem.state("u1").values == {"lives_in": "Delhi"}
+        finally:
+            hold.set()
 
 
 def test_language_replace_set() -> None:

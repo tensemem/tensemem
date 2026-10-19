@@ -65,16 +65,16 @@ def immediate_transaction(conn: sqlite3.Connection) -> Generator[sqlite3.Connect
     try:
         yield conn
     except BaseException:
-        _rollback_quietly(conn)
+        rollback_quietly(conn)
         raise
     try:
         conn.execute("COMMIT")
     except BaseException:
-        _rollback_quietly(conn)
+        rollback_quietly(conn)
         raise
 
 
-def _rollback_quietly(conn: sqlite3.Connection) -> None:
+def rollback_quietly(conn: sqlite3.Connection) -> None:
     try:
         if conn.in_transaction:
             conn.execute("ROLLBACK")

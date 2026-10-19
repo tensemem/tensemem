@@ -22,6 +22,7 @@ from tensemem.core.models import (
     FactSet,
     FactSource,
     JobKind,
+    JobStatus,
     JobView,
     Mutation,
     OnStale,
@@ -58,7 +59,7 @@ from tensemem.storage.sqlite.facts import (
     restore_displaced,
 )
 from tensemem.storage.sqlite.jobs import dismiss as dismiss_job
-from tensemem.storage.sqlite.jobs import enqueue, has_due_or_leased, list_jobs
+from tensemem.storage.sqlite.jobs import enqueue, get_job, has_due_or_leased, list_jobs
 from tensemem.storage.sqlite.jobs import retry as retry_job
 from tensemem.storage.sqlite.meta import get_fence_tag
 from tensemem.storage.sqlite.reads import forget_scope, read_explain, read_history, read_state
@@ -96,7 +97,7 @@ class Memory:
         self._stop.set()
         self._wake.set()
         if self._worker is not None:
-            self._worker.join(timeout=2)
+            self._worker.join()
             self._worker = None
         self._db.close()
 
@@ -162,37 +163,55 @@ class Memory:
         result = self._db.transaction(write)
         self._wake.set()
         if wait:
-            self.flush(timeout=timeout)
+            self.flush(timeout=timeout, job_id=result.job_id)
         return result
 
-    def flush(self, timeout: float = 10.0) -> None:
-        """Run due extract jobs until the queue is idle or ``timeout`` seconds elapse."""
-        if not self._has_work():
+    def flush(self, timeout: float = 10.0, *, job_id: str | None = None) -> None:
+        """Run due extract jobs until the queue is idle or ``timeout`` seconds elapse.
+
+        Pass ``job_id`` to return as soon as that job leaves QUEUED/LEASED, even
+        if another scope still has work.
+        """
+        if not self._waiting(job_id):
             return
         if self._llm is None:
             msg = "flush() needs Memory(..., llm=...)"
             raise RuntimeError(msg)
         deadline = time.monotonic() + timeout
         while True:
+            if job_id is not None and not self._waiting(job_id):
+                return
             if process_one(self._db, self._llm):
                 if time.monotonic() >= deadline:
                     break
                 continue
-            if not self._has_work():
+            if not self._waiting(job_id):
                 return
             if time.monotonic() >= deadline:
                 break
             remaining = deadline - time.monotonic()
             self._wake.wait(timeout=min(_WORKER_IDLE, max(remaining, 0.0)))
             self._wake.clear()
-        if self._has_work():
+        if self._waiting(job_id):
             msg = f"extract jobs still pending after {timeout}s"
             raise TimeoutError(msg)
+
+    def _waiting(self, job_id: str | None) -> bool:
+        if job_id is None:
+            return self._has_work()
+        return self._job_pending(job_id)
 
     def _has_work(self) -> bool:
         # Same connection as lease/complete so flush cannot race the worker
         # on a shared-cache in-memory database.
         return self._db.write(lambda conn: has_due_or_leased(conn, self._db.now()))
+
+    def _job_pending(self, job_id: str) -> bool:
+        def pending(conn: sqlite3.Connection) -> bool:
+            job = get_job(conn, job_id)
+            return job is not None and job.status in {JobStatus.QUEUED, JobStatus.LEASED}
+
+        return self._db.write(pending)
 
     def _run_worker(self) -> None:
         provider = self._llm
@@ -201,9 +220,11 @@ class Memory:
         while not self._stop.is_set():
             try:
                 worked = process_one(self._db, provider)
-            except RuntimeError:
-                return
-            except Exception:
+            except Exception as extra:
+                if self._stop.is_set() or (
+                    isinstance(extra, RuntimeError) and "is closed" in str(extra)
+                ):
+                    return
                 worked = False
             if worked:
                 continue

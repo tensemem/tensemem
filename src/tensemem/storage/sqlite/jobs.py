@@ -221,11 +221,22 @@ def list_jobs(conn: sqlite3.Connection, *, scope_id: int | None = None) -> tuple
 
 def has_due_or_leased(conn: sqlite3.Connection, now: str) -> bool:
     """True when the worker can still make progress at ``now``."""
+    if _circuit_open(conn, now):
+        row = conn.execute("SELECT 1 FROM jobs WHERE status = 'LEASED' LIMIT 1").fetchone()
+        return row is not None
     row = conn.execute(
         """
-        SELECT 1 FROM jobs
-        WHERE status = 'LEASED'
-           OR (status = 'QUEUED' AND next_run_at <= ?)
+        SELECT 1 FROM jobs j
+        WHERE j.status = 'LEASED'
+           OR (
+             j.status = 'QUEUED' AND j.next_run_at <= ?
+             AND NOT EXISTS (
+               SELECT 1 FROM jobs earlier
+               WHERE earlier.scope_id = j.scope_id
+                 AND earlier.id < j.id
+                 AND earlier.status IN ('QUEUED', 'LEASED', 'DEAD')
+             )
+           )
         LIMIT 1
         """,
         (now,),

@@ -26,6 +26,7 @@ from tensemem.storage.sqlite.jobs import (
     enqueue,
     fail,
     get_job,
+    has_due_or_leased,
     lease_next,
     retry,
 )
@@ -129,6 +130,14 @@ def test_circuit_opens_after_repeated_provider_failures(db: SqliteDatabase) -> N
         failed = _fail_once(db, str(job["job_id"]), now, jitter=0.0, provider_error=True)
         now = failed.next_run_at
     assert db.transaction(lambda conn: lease_next(conn, now=now)) is None
+    assert db.transaction(lambda conn: has_due_or_leased(conn, now)) is False
+
+
+def test_due_job_behind_dead_is_not_progress(db: SqliteDatabase) -> None:
+    first = _ingest(db, "u1", "one")
+    _fail_until_dead(db, str(first["job_id"]))
+    _ingest(db, "u1", "two")
+    assert db.transaction(lambda conn: has_due_or_leased(conn, db.now())) is False
 
 
 def test_unknown_job_and_dismiss_guard(db: SqliteDatabase) -> None:
