@@ -94,3 +94,6 @@ testpaths = ["tests"]
 addopts = ["-ra", "--strict-markers", "--strict-config", "--import-mode=importlib"]
 xfail_strict = true
 filterwarnings = ["error"]
+markers = [
+  "live: calls a real model; skipped unless TENSEMEM_LIVE=1 and OPENAI_API_KEY is set",
+]

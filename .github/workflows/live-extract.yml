@@ -1,0 +1,112 @@
+name: Live extract
+
+on:
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: live-extract-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  live:
+    name: Canonical chat
+    if: github.event.issue.pull_request && startsWith(github.event.comment.body, '/test')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Authorize /test
+        id: gate
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BODY: ${{ github.event.comment.body }}
+          ACTOR: ${{ github.event.comment.user.login }}
+          ISSUE: ${{ github.event.issue.number }}
+        run: |
+          set -euo pipefail
+          first=$(printf '%s\n' "$BODY" | head -n1 | tr -d '\r')
+          cmd=${first%% *}
+          if [ "$cmd" != "/test" ]; then
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          set +e
+          perm=$(gh api "repos/${GITHUB_REPOSITORY}/collaborators/${ACTOR}/permission" --jq .permission)
+          status=$?
+          set -e
+          if [ "$status" -ne 0 ] || [ "$perm" != "admin" ]; then
+            gh pr comment "$ISSUE" --body "Skipped live extract: only repository admins can run \`/test\`."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          cross=$(gh pr view "$ISSUE" --json isCrossRepository --jq .isCrossRepository)
+          if [ "$cross" = "true" ]; then
+            gh pr comment "$ISSUE" --body "Skipped live extract: \`/test\` only runs on same-repository pull requests."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          sha=$(gh pr view "$ISSUE" --json headRefOid --jq .headRefOid)
+          echo "run=true" >> "$GITHUB_OUTPUT"
+          echo "sha=$sha" >> "$GITHUB_OUTPUT"
+
+      - if: steps.gate.outputs.run == 'true'
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.gate.outputs.sha }}
+
+      - name: Require API key
+        if: steps.gate.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${OPENAI_API_KEY:-}" ]; then
+            gh pr comment "$ISSUE" --body "Live extract could not start: repository secret \`OPENAI_API_KEY\` is not set."
+            exit 1
+          fi
+
+      - if: steps.gate.outputs.run == 'true'
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+          python-version: "3.12"
+
+      - if: steps.gate.outputs.run == 'true'
+        run: uv sync --locked --extra openai
+
+      - name: Run live extract
+        if: steps.gate.outputs.run == 'true'
+        env:
+          TENSEMEM_LIVE: "1"
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+        run: uv run pytest -m live --tb=short
+
+      - name: Comment success
+        if: success() && steps.gate.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh pr comment "$ISSUE" --body "Live extract passed on the canonical chat (Delhi then Bangalore / Rust). Log: ${RUN_URL}"
+
+      - name: Comment failure
+        if: failure() && steps.gate.outputs.run == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh pr comment "$ISSUE" --body "Live extract failed. Log: ${RUN_URL}"
