@@ -51,7 +51,7 @@ from tensemem.providers.llm.base import LLMProvider
 from tensemem.security.fence import strip as strip_fences
 from tensemem.security.fence import wrap as wrap_fence
 from tensemem.storage.sqlite import SqliteDatabase
-from tensemem.storage.sqlite.embeddings import enqueue_episode_embed, enqueue_fact_embeds
+from tensemem.storage.sqlite.embeddings import enqueue_fact_embeds
 from tensemem.storage.sqlite.entities import (
     SELF_NAME,
     ensure_subject_entity,
@@ -122,6 +122,14 @@ class Memory:
 
     def has_worker(self) -> bool:
         return self._llm is not None or self._embedder is not None
+
+    def embed_query(self, query: str) -> tuple[list[float] | None, str | None]:
+        if self._embedder is None or not query.strip():
+            return None, None
+        try:
+            return self._embedder.embed([query])[0], self._embedder.model
+        except Exception:
+            return None, None
 
     def stopped(self) -> bool:
         return self._stop.is_set()
@@ -465,6 +473,7 @@ class Memory:
         key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
         policy = OnStale(on_stale)
         layout = ContextFormat(fmt)
+        query_vector, embed_model = self.embed_query(query)
 
         def pack() -> tuple[ContextResult, int | None]:
             return self.pack_context(
@@ -474,6 +483,8 @@ class Memory:
                 fence=fence,
                 include_history=include_history,
                 fmt=layout,
+                query_vector=query_vector,
+                embed_model=embed_model,
             )
 
         packed, scope_id = pack()
@@ -514,14 +525,11 @@ class Memory:
         fence: bool,
         include_history: bool = False,
         fmt: ContextFormat = ContextFormat.MARKDOWN,
+        query_vector: Sequence[float] | None = None,
+        embed_model: str | None = None,
     ) -> tuple[ContextResult, int | None]:
         as_of = self._db.now()[:10]
         now = self._db.now()
-        query_vector = None
-        embed_model = None
-        if self._embedder is not None and query.strip():
-            query_vector = self._embedder.embed([query])[0]
-            embed_model = self._embedder.model
 
         def load(conn: sqlite3.Connection) -> tuple[ContextResult, int | None]:
             scope = get_scope(conn, key)
@@ -590,11 +598,7 @@ class Memory:
         """Ranked facts and episodes for ``query`` (FTS, optional embeddings)."""
         key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
         now = self._db.now()
-        query_vector = None
-        embed_model = None
-        if self._embedder is not None and query.strip():
-            query_vector = self._embedder.embed([query])[0]
-            embed_model = self._embedder.model
+        query_vector, embed_model = self.embed_query(query)
 
         def load(conn: sqlite3.Connection) -> SearchResult:
             scope = get_scope(conn, key)
@@ -713,10 +717,6 @@ class Memory:
                 now=now,
                 enqueue_embed=self._embedder is not None,
             )
-            if self._embedder is not None:
-                enqueue_episode_embed(
-                    conn, scope_id=scope.id, now=now, episode_id=seq, text=content
-                )
             advance_watermark(conn, scope.id)
             return AddResult(seq=seq, episode_ids=(public_id,))
 
@@ -979,6 +979,7 @@ class AsyncMemory:
         key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
         policy = OnStale(on_stale)
         layout = ContextFormat(fmt)
+        query_vector, embed_model = await asyncio.to_thread(self._sync.embed_query, query)
         packed, scope_id = await asyncio.to_thread(
             self._sync.pack_context,
             key,
@@ -987,6 +988,8 @@ class AsyncMemory:
             fence=fence,
             include_history=include_history,
             fmt=layout,
+            query_vector=query_vector,
+            embed_model=embed_model,
         )
         if caught_up(packed.freshness, min_seq):
             return packed
@@ -1008,6 +1011,8 @@ class AsyncMemory:
                     fence=fence,
                     include_history=include_history,
                     fmt=layout,
+                    query_vector=query_vector,
+                    embed_model=embed_model,
                 )
                 if caught_up(packed.freshness, min_seq):
                     return packed
@@ -1024,6 +1029,8 @@ class AsyncMemory:
                 fence=fence,
                 include_history=include_history,
                 fmt=layout,
+                query_vector=query_vector,
+                embed_model=embed_model,
             )
             if caught_up(packed.freshness, min_seq):
                 return packed
@@ -1035,6 +1042,8 @@ class AsyncMemory:
             fence=fence,
             include_history=include_history,
             fmt=layout,
+            query_vector=query_vector,
+            embed_model=embed_model,
         )
         if caught_up(packed.freshness, min_seq):
             return packed

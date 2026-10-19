@@ -54,9 +54,10 @@ def assemble_search(
         embed_model=embed_model,
         force_episodes=bool(query.strip()),
     )
-    hits = to_search_hits(scored, limit=limit)
+    matched = [item for item in scored if item.relevance > 0.0]
+    hits = to_search_hits(matched, limit=limit)
     used = {hit.id for hit in hits}
-    return hits, debug_items([item for item in scored if item.item_id in used])
+    return hits, debug_items([item for item in matched if item.item_id in used])
 
 
 def assemble_context(
@@ -149,6 +150,7 @@ def _candidates(
                 terms=terms,
                 query_vector=query_vector,
                 embed_model=embed_model,
+                fallback=not force_episodes,
             )
         )
     return scored
@@ -183,9 +185,10 @@ def _episode_scores(
     terms: Sequence[str],
     query_vector: Sequence[float] | None,
     embed_model: str | None,
+    fallback: bool,
 ) -> list[Scored]:
     hits = search_episodes(conn, scope_id, query) if query.strip() else ()
-    if not hits:
+    if not hits and fallback:
         hits = list_processed_episodes(conn, scope_id)
     vectors = episode_vectors(conn, scope_id, embed_model) if embed_model else {}
     scored: list[Scored] = []

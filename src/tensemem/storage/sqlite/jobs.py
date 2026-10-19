@@ -22,6 +22,15 @@ CIRCUIT_THRESHOLD = 5
 CIRCUIT_COOLDOWN_SECONDS = 30.0
 _CIRCUIT_FAILURES = "circuit.failures"
 _CIRCUIT_OPEN_UNTIL = "circuit.open_until"
+# DEAD extract jobs keep the per-scope prefix; a failed embed must not stall later work.
+_BLOCKS_EARLIER = """
+              earlier.scope_id = j.scope_id
+              AND earlier.id < j.id
+              AND (
+                earlier.status IN ('QUEUED', 'LEASED')
+                OR (earlier.status = 'DEAD' AND earlier.kind <> 'embed')
+              )
+"""
 
 
 def enqueue(
@@ -107,9 +116,7 @@ def lease_next(
           )
           AND NOT EXISTS (
             SELECT 1 FROM jobs earlier
-            WHERE earlier.scope_id = j.scope_id
-              AND earlier.id < j.id
-              AND earlier.status IN ('QUEUED', 'LEASED', 'DEAD')
+            WHERE {_BLOCKS_EARLIER}
           )
         ORDER BY CASE WHEN j.scope_id = ? THEN 0 ELSE 1 END, j.id
         LIMIT 1
@@ -285,16 +292,14 @@ def has_due_or_leased(conn: sqlite3.Connection, now: str) -> bool:
         row = conn.execute("SELECT 1 FROM jobs WHERE status = 'LEASED' LIMIT 1").fetchone()
         return row is not None
     row = conn.execute(
-        """
+        f"""
         SELECT 1 FROM jobs j
         WHERE j.status = 'LEASED'
            OR (
              j.status = 'QUEUED' AND j.next_run_at <= ?
              AND NOT EXISTS (
                SELECT 1 FROM jobs earlier
-               WHERE earlier.scope_id = j.scope_id
-                 AND earlier.id < j.id
-                 AND earlier.status IN ('QUEUED', 'LEASED', 'DEAD')
+               WHERE {_BLOCKS_EARLIER}
              )
            )
         LIMIT 1

@@ -1,8 +1,10 @@
 from tensemem.core.models import FactStatus, FactView
 from tensemem.core.retrieve import (
+    EpisodeHit,
     cosine,
     fts_query,
     norm_bm25,
+    score_episode,
     score_fact,
     wants_episodes,
     wants_history,
@@ -33,6 +35,27 @@ def test_score_prefers_fts_match_over_unrelated_recency() -> None:
     diet_score = score_fact(diet, now="2026-10-19T11:00:00.000000Z", terms=("live",))
     assert city_score.score > diet_score.score
     assert city_score.reason == "match"
+
+
+def test_missing_episode_rank_is_not_a_match() -> None:
+    hit = EpisodeHit(
+        public_id="e1",
+        content="We picked the Koramangala place",
+        occurred_at="2026-10-18T11:00:00.000000Z",
+    )
+    scored = score_episode(hit, now="2026-10-18T11:00:00.000000Z", terms=("pizza",))
+    assert scored.relevance == 0.0
+    ranked = score_episode(
+        EpisodeHit(
+            public_id="e2",
+            content="pizza night",
+            occurred_at="2026-10-18T11:00:00.000000Z",
+            rank=-4.0,
+        ),
+        now="2026-10-18T11:00:00.000000Z",
+        terms=("pizza",),
+    )
+    assert ranked.relevance > scored.relevance
 
 
 def test_cosine_and_bm25_are_bounded() -> None:

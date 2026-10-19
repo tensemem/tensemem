@@ -6,6 +6,7 @@ import sqlite3
 import struct
 from collections.abc import Sequence
 
+from tensemem.security.scrub import scrub
 from tensemem.storage.sqlite.facts import ApplyResult, search_text
 from tensemem.storage.sqlite.jobs import enqueue_embed
 from tensemem.storage.sqlite.snapshot import load_fact_view, to_fact_view
@@ -111,7 +112,7 @@ def enqueue_fact_embeds(
             now=now,
             owner_kind="fact",
             owner_id=result.fact_id,
-            text=search_text(view.subject, view.predicate, view.object),
+            text=scrub(search_text(view.subject, view.predicate, view.object)),
         )
 
 
@@ -129,5 +130,5 @@ def enqueue_episode_embed(
         now=now,
         owner_kind="episode",
         owner_id=episode_id,
-        text=text,
+        text=scrub(text),
     )

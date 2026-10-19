@@ -24,6 +24,7 @@ from tensemem.storage.sqlite.jobs import (
     complete,
     dismiss,
     enqueue,
+    enqueue_embed,
     fail,
     get_job,
     has_due_or_leased,
@@ -120,6 +121,34 @@ def test_complete_advances_watermark(db: SqliteDatabase) -> None:
     db.transaction(lambda conn: lease_next(conn, now=db.now()))
     _complete(db, str(job["job_id"]))
     assert _scope(db, "u1").applied_seq == job["seq"]
+
+
+def test_dead_embed_does_not_block_later_extract(db: SqliteDatabase) -> None:
+    scope = _scope(db, "u1")
+    embed_id = str(
+        db.transaction(
+            lambda conn: enqueue_embed(
+                conn, scope_id=scope.id, now=db.now(), owner_kind="fact", owner_id=1, text="x"
+            )
+        )
+    )
+    later = _ingest(db, "u1", "hello")
+    now = db.now()
+    current: JobView | None = None
+    while current is None or current.status is not JobStatus.DEAD:
+
+        def write(conn: sqlite3.Connection, at: str = now) -> JobView:
+            leased = lease_next(conn, now=at, kind=JobKind.EMBED)
+            assert leased is not None
+            assert leased.lease_until is not None
+            return fail(conn, embed_id, "boom", now=at, lease_until=leased.lease_until, jitter=0.0)
+
+        current = db.transaction(write)
+        now = current.next_run_at
+    assert db.transaction(lambda conn: has_due_or_leased(conn, db.now())) is True
+    nxt = db.transaction(lambda conn: lease_next(conn, now=db.now()))
+    assert nxt is not None
+    assert nxt.id == str(later["job_id"])
 
 
 def test_dismiss_unblocks_the_scope(db: SqliteDatabase) -> None:

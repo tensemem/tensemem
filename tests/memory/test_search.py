@@ -65,6 +65,25 @@ def test_episodic_fallback_and_json_xml_debug() -> None:
         assert "spicy food" in as_xml.text
 
 
+def test_search_omits_unrelated_facts() -> None:
+    with _memory() as mem:
+        mem.register_predicate("lives_in")
+        mem.set(user_id="u1", predicate="lives_in", value="Bangalore")
+        found = mem.search("u1", "pizza")
+        assert found.hits == ()
+
+
+def test_embedder_failure_falls_back_to_fts() -> None:
+    with _memory(embedder=_BoomEmbedder()) as mem:
+        mem.register_predicate("lives_in")
+        mem.set(user_id="u1", predicate="lives_in", value="Bangalore")
+        ctx = mem.context("u1", "where did I live")
+        assert "Bangalore" in ctx.text
+        found = mem.search("u1", "live")
+        assert found.hits
+        assert found.hits[0].predicate == "lives_in"
+
+
 def test_embedder_writes_vectors_and_boosts_search() -> None:
     with _memory(embedder=FakeEmbedder()) as mem:
         mem.register_predicate("lives_in")
@@ -78,8 +97,28 @@ def test_embedder_writes_vectors_and_boosts_search() -> None:
         embed_jobs = [job for job in mem.jobs("u1") if job.kind.value == "embed"]
         assert embed_jobs
         assert all(job.status.value == "DONE" for job in embed_jobs)
+        assert all(job.owner_kind == "fact" for job in embed_jobs)
 
 
-def _memory(*, embedder: FakeEmbedder | None = None) -> Memory:
+def test_fact_embed_jobs_scrub_secrets() -> None:
+    key = "sk-" + "Xi8tcNiHV9awbCcvilTe" + "T3BlbkFJ" + "3UDnpdEwNNm6wVBpYM0o"
+    with _memory(embedder=FakeEmbedder()) as mem:
+        mem.register_predicate("api_token")
+        mem.set(user_id="u1", predicate="api_token", value=key)
+        embed = next(job for job in mem.jobs("u1") if job.kind.value == "embed")
+        assert key not in (embed.embed_text or "")
+        assert "[REDACTED]" in (embed.embed_text or "")
+
+
+class _BoomEmbedder:
+    model = "boom"
+    dim = 1
+
+    def embed(self, texts: object) -> list[list[float]]:
+        del texts
+        raise RuntimeError("down")
+
+
+def _memory(*, embedder: FakeEmbedder | _BoomEmbedder | None = None) -> Memory:
     clock = FrozenClock(datetime(2026, 10, 18, 11, 0, 0, tzinfo=UTC))
     return Memory(":memory:", clock=clock, llm=FakeExtractor(), embedder=embedder)

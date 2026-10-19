@@ -80,7 +80,7 @@ class EpisodeHit:
     public_id: str
     content: str
     occurred_at: str
-    rank: float = 0.0
+    rank: float | None = None
 
 
 @dataclass(frozen=True)
@@ -210,7 +210,8 @@ def score_episode(
     cosine_sim: float | None = None,
 ) -> Scored:
     lexical = lexical_overlap(episode.content, terms)
-    relevance = max(norm_bm25(episode.rank), cosine_sim or 0.0, lexical)
+    bm25 = norm_bm25(episode.rank) if episode.rank is not None else 0.0
+    relevance = max(bm25, cosine_sim or 0.0, lexical)
     recency = recency_score(episode.occurred_at, now)
     raw = 0.40 * relevance + 0.25 * recency
     return Scored(
