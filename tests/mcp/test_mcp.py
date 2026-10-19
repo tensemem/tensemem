@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 from tensemem import FakeExtractor, Memory
+from tensemem.core.models import JobStatus
 from tensemem.mcp import TOOL_NAMES, bind_server, call_tool, seed_starter, serve
 
 
@@ -109,3 +110,41 @@ def test_serve_opens_database(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -
     with Memory(db, start_worker=False) as mem:
         mem.set(user_id="u1", predicate="lives_in", value="Goa")
         assert mem.state("u1").values == {"lives_in": "Goa"}
+
+
+def test_serve_leaves_existing_jobs_queued(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    db = tmp_path / "mcp.db"
+    with Memory(db, start_worker=False) as mem:
+        mem.register_predicate("lives_in")
+        mem.add("u1", "I live in Delhi")
+        job_id = mem.jobs("u1")[0].id
+        assert mem.jobs("u1")[0].status is JobStatus.QUEUED
+
+    seen: dict[str, object] = {}
+
+    def during_serve(
+        mem: Memory,
+        *,
+        default_user: str = "",
+        agent_id: str = "",
+        namespace: str = "default",
+    ) -> None:
+        del default_user, agent_id, namespace
+        queued = mem.jobs("u1")
+        assert queued[0].id == job_id
+        assert queued[0].status is JobStatus.QUEUED
+        payload = json.loads(
+            call_tool(mem, "remember", {"user_id": "u2", "text": "I live in Pune"})
+        )
+        assert payload["values"]["lives_in"] == "Pune"
+        still = mem.jobs("u1")
+        assert still[0].id == job_id
+        assert still[0].status is JobStatus.QUEUED
+        seen["ok"] = True
+
+    monkeypatch.setattr("tensemem.mcp.run_stdio", during_serve)
+    serve(db)
+    assert seen["ok"] is True
+    with Memory(db, start_worker=False) as mem:
+        assert mem.jobs("u1")[0].status is JobStatus.QUEUED
+        assert mem.state("u2").values == {"lives_in": "Pune"}

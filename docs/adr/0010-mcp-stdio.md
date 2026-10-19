@@ -13,7 +13,7 @@ Hosts that speak MCP can attach a local process over stdin/stdout and call tools
 2. **Five tools, mapped 1:1 onto the engine:** `remember` → `add()`, `recall_context` → `context()`, `get_state` → `state()`, `get_history` → `history()`, `forget` → `forget()`. Tools return JSON text, including `freshness.is_current` on reads.
 3. **The agent does not decide SET/UPDATE.** `remember` only ingests user text. Extraction and `resolve()` still apply typed ops (ADR 0002). There is no tool that writes a predicate by name.
 4. **The SDK is an optional extra** (`tensemem[mcp]`). Tool dispatch is independent of that import so CI can score the mapping without the SDK. Missing extra is a clear error, not a partial server.
-5. **Default extractor is `FakeExtractor`**, so a desktop config works without an API key. `remember` waits when a provider is present so the next `recall_context` can be current.
+5. **Default extractor is `FakeExtractor`**, so a desktop config works without an API key. The background worker stays off so jobs already queued in a shared file are not claimed at startup. `remember` waits in the tool call so that message still extracts.
 6. **MCP seeds a small starter registry** (the FakeExtractor predicates: `lives_in`, `uses_language`, …). The Python API still starts empty; this seed is only so a fresh `--db` file can extract on the first `remember`.
 
 ## Alternatives considered

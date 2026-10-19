@@ -83,8 +83,12 @@ def serve(
     agent_id: str = "",
     namespace: str = "default",
 ) -> None:
-    """Open ``path`` and serve the five tools on stdio until the host exits."""
-    with Memory(path, llm=FakeExtractor()) as mem:
+    """Open ``path`` and serve the five tools on stdio until the host exits.
+
+    The extract worker stays off so queued jobs from another process are not
+    claimed by ``FakeExtractor``. ``remember`` still waits in the tool call.
+    """
+    with Memory(path, llm=FakeExtractor(), start_worker=False) as mem:
         seed_starter(mem)
         run_stdio(mem, default_user=default_user, agent_id=agent_id, namespace=namespace)
 

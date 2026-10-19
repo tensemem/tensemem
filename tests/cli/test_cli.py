@@ -108,6 +108,9 @@ def test_mcp_cli_creates_db_and_reports_missing_extra(
         seen["namespace"] = namespace
 
     monkeypatch.setattr("tensemem.mcp.serve", fake_serve)
+    with pytest.raises(SystemExit) as raised:
+        main(["mcp", "--db", str(db), "--user", "u1"])
+    assert raised.value.code == 2
     assert main(["--db", str(db), "--agent", "a1", "mcp", "--user", "u1"]) == 0
     assert seen == {
         "path": str(db),

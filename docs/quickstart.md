@@ -35,7 +35,7 @@ An MCP host can use the same file:
 
 ```bash
 pip install "tensemem[mcp]"
-tensemem mcp --db /absolute/path/tensemem.db --user u1
+tensemem --db /absolute/path/tensemem.db mcp --user u1
 ```
 
 See [MCP](mcp.md) for the tool list and host config.

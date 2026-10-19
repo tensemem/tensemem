@@ -4,7 +4,7 @@
 
 ```bash
 pip install "tensemem[mcp]"
-tensemem mcp --db /absolute/path/tensemem.db --user u1
+tensemem --db /absolute/path/tensemem.db mcp --user u1
 ```
 
 Host config (stdio):
@@ -14,13 +14,13 @@ Host config (stdio):
   "mcpServers": {
     "tensemem": {
       "command": "tensemem",
-      "args": ["mcp", "--db", "/absolute/path/tensemem.db", "--user", "u1"]
+      "args": ["--db", "/absolute/path/tensemem.db", "mcp", "--user", "u1"]
     }
   }
 }
 ```
 
-`--user` is the default `user_id` when a tool omits it. `--agent` and `--namespace` are the process-wide scope, same as the CLI.
+`--db`, `--agent`, and `--namespace` are root flags (before `mcp`). `--user` is the default `user_id` when a tool omits it.
 
 A fresh file is seeded with the FakeExtractor predicates (`lives_in`, `uses_language`, and the rest of that set) so `remember` can extract without a Python app calling `register_predicate` first. Re-opening the file is a no-op for those names.
 
@@ -28,7 +28,7 @@ A fresh file is seeded with the FakeExtractor predicates (`lives_in`, `uses_lang
 
 | Tool | Engine call | Notes |
 |---|---|---|
-| `remember` | `add()` | Ingests user text. The engine extracts; this tool does not edit slots. Waits when an extractor is present (default: `FakeExtractor`). |
+| `remember` | `add()` | Ingests user text. The engine extracts; this tool does not edit slots. Waits in the tool call (no background worker, so jobs already queued for other scopes stay queued). |
 | `recall_context` | `context()` | Fenced prompt block plus `freshness.is_current`. Optional `query`, `max_tokens`. |
 | `get_state` | `state()` | ACTIVE values and facts. |
 | `get_history` | `history()` | Optional `predicate` for the version chain. |
