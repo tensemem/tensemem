@@ -89,6 +89,36 @@ def test_concurrent_reads_and_serialized_writes(tmp_path: Path) -> None:
         assert all(int(value) <= 20 for value in reads)
 
 
+def test_in_memory_reads_retry_writer_table_locks() -> None:
+    with SqliteDatabase(":memory:", read_pool_size=2) as db:
+
+        def seed(conn: sqlite3.Connection) -> None:
+            conn.execute("INSERT INTO meta(key, value) VALUES ('n', '0')")
+
+        db.transaction(seed)
+
+        def bump(conn: sqlite3.Connection) -> None:
+            conn.execute("UPDATE meta SET value = CAST(value AS INT) + 1 WHERE key = 'n'")
+
+        def write_loop(_i: int) -> None:
+            for _ in range(40):
+                db.transaction(bump)
+
+        def read_once(conn: sqlite3.Connection) -> sqlite3.Row | None:
+            return conn.execute("SELECT value FROM meta WHERE key='n'").fetchone()
+
+        def read_loop(_i: int) -> None:
+            for _ in range(40):
+                row = db.read(read_once)
+                assert row is not None
+
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            futures = [pool.submit(write_loop, i) for i in range(2)]
+            futures.extend(pool.submit(read_loop, i) for i in range(2))
+            for future in futures:
+                future.result()
+
+
 def test_reopen_is_idempotent(tmp_path: Path) -> None:
     path = tmp_path / "t.db"
     clock = FrozenClock(datetime(2026, 10, 17, 12, 0, 0, tzinfo=UTC))

@@ -190,7 +190,9 @@ class Memory:
             raise TimeoutError(msg)
 
     def _has_work(self) -> bool:
-        return self._db.read(lambda conn: has_due_or_leased(conn, self._db.now()))
+        # Same connection as lease/complete so flush cannot race the worker
+        # on a shared-cache in-memory database.
+        return self._db.write(lambda conn: has_due_or_leased(conn, self._db.now()))
 
     def _run_worker(self) -> None:
         provider = self._llm

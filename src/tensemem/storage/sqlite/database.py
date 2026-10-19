@@ -7,6 +7,7 @@ import queue
 import shutil
 import sqlite3
 import threading
+import time
 import uuid
 from collections.abc import Callable
 from concurrent.futures import Future
@@ -24,6 +25,8 @@ T = TypeVar("T")
 
 _SENTINEL = object()
 _WorkItem = tuple[Callable[[sqlite3.Connection], Any], Future[Any]]
+_TABLE_LOCK_ATTEMPTS = 50
+_TABLE_LOCK_SLEEP = 0.01
 
 
 class SqliteDatabase:
@@ -99,11 +102,16 @@ class SqliteDatabase:
         self.transaction(lambda conn: seed_ontology(conn, ontology, now=self.now()))
 
     def read(self, fn: Callable[[sqlite3.Connection], T]) -> T:
-        """Borrow a read-only connection, run ``fn``, and return it to the pool."""
+        """Borrow a read-only connection, run ``fn``, and return it to the pool.
+
+        In-memory DBs use shared cache, so a reader can see ``SQLITE_LOCKED``
+        while the writer holds ``BEGIN IMMEDIATE``. ``busy_timeout`` does not
+        retry that; we do.
+        """
         self._ensure_open()
         conn = self._read_pool.get()
         try:
-            return fn(conn)
+            return _retry_table_lock(fn, conn)
         finally:
             self._read_pool.put(conn)
 
@@ -135,7 +143,8 @@ class SqliteDatabase:
             fn, future = cast(_WorkItem, item)
             if future.set_running_or_notify_cancel():
                 try:
-                    future.set_result(fn(self._writer))
+                    # Shared-cache readers can lock a table; busy_timeout does not retry that.
+                    future.set_result(_retry_table_lock(fn, self._writer))
                 except BaseException as exc:
                     # Propagate every failure (including cancel) to the waiting caller.
                     future.set_exception(exc)
@@ -144,6 +153,27 @@ class SqliteDatabase:
         if self._closed:
             msg = "SqliteDatabase is closed"
             raise RuntimeError(msg)
+
+
+def _retry_table_lock(fn: Callable[[sqlite3.Connection], T], conn: sqlite3.Connection) -> T:
+    last: sqlite3.OperationalError | None = None
+    for _ in range(_TABLE_LOCK_ATTEMPTS):
+        try:
+            return fn(conn)
+        except sqlite3.OperationalError as exc:
+            if not _is_table_locked(exc):
+                raise
+            last = exc
+            time.sleep(_TABLE_LOCK_SLEEP)
+    assert last is not None
+    raise last
+
+
+def _is_table_locked(exc: sqlite3.OperationalError) -> bool:
+    code = getattr(exc, "sqlite_errorcode", None)
+    if code == sqlite3.SQLITE_LOCKED:
+        return True
+    return "database table is locked" in str(exc)
 
 
 def _backup_if_file(path: str | Path) -> None:
