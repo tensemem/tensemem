@@ -101,6 +101,26 @@ class SqliteDatabase:
         """Optionally load predicates and entities from an app-owned ontology."""
         self.transaction(lambda conn: seed_ontology(conn, ontology, now=self.now()))
 
+    def backup_to(self, dest: str | Path) -> None:
+        """Copy this database to ``dest`` using SQLite's online backup API."""
+        target = Path(dest).expanduser()
+        if str(self._path) not in {":memory:", ""} and not str(self._path).startswith("file:"):
+            source = Path(self._path).expanduser().resolve()
+            if target.resolve() == source:
+                msg = "backup destination is the open database"
+                raise ValueError(msg)
+        target.parent.mkdir(parents=True, exist_ok=True)
+
+        def run(conn: sqlite3.Connection) -> None:
+            dst = sqlite3.connect(str(target))
+            try:
+                conn.backup(dst)
+                dst.commit()
+            finally:
+                dst.close()
+
+        self.write(run)
+
     def read(self, fn: Callable[[sqlite3.Connection], T]) -> T:
         """Borrow a read-only connection, run ``fn``, and return it to the pool.
 

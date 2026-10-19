@@ -23,6 +23,8 @@ uv run pytest
 uvx codespell --skip="*.lock,.git,uv.lock" --ignore-words-list="tensemem"
 ```
 
+The `tensemem` CLI (`python -m tensemem --help`) reads a SQLite file; it does not start the extract worker. Docs live in `docs/` with `mkdocs.yml` at the repo root (`uvx mkdocs serve` to preview).
+
 Default pytest never calls a model. To run the live extract locally after `uv sync --extra openai`:
 
 ```bash

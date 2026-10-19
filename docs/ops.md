@@ -1,0 +1,34 @@
+# Operations
+
+## Backup
+
+```python
+mem.backup("tensemem.bak.db")
+```
+
+This uses SQLite's online backup API on the writer connection, so it is consistent with in-flight transactions. The CLI equivalent is `tensemem backup copy.db`.
+
+Opening an existing file that still has pending schema migrations copies it to `*.bak` first, then applies the remaining SQL.
+
+## JSONL export and import
+
+`export_jsonl` writes the predicate registry and that user's episodes. `import_jsonl` replays them as new `register_predicate` / `set` / `add` calls, so public ids change. Corrections are preserved by `backup()` and by `rebuild()` on the original file (rejected claims stay in SQLite).
+
+## Litestream
+
+For a durable single-node file, stream the WAL:
+
+```bash
+# Example: replicate tensemem.db to S3-compatible storage.
+litestream replicate tensemem.db s3://your-bucket/tensemem
+```
+
+SQLite is opened in WAL mode with `synchronous=NORMAL` and `busy_timeout=5000`. Run Litestream beside the process that owns the file. Restore by stopping writers, then `litestream restore`.
+
+## Migrations
+
+Numbered files live in the package (`0001_init.sql`, …) and run automatically on open. Tests open databases that stopped at an earlier version and check that remaining migrations apply and data is still searchable.
+
+## Concurrency
+
+One writer thread per `Memory` process. Two processes (or two `Memory` handles) on the same file serialize on `BEGIN IMMEDIATE` plus the busy timeout. For heavy multi-process ingest, run one writer.

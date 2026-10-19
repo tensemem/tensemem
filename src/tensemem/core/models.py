@@ -366,6 +366,25 @@ class ContextResult(BaseModel):
     debug: tuple[ContextDebugItem, ...] = ()
 
 
+class MemoryStats(BaseModel):
+    """Counts from ``Memory.stats()`` for queue depth, facts, and rough size."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    scopes: int = Field(ge=0)
+    episodes: int = Field(ge=0)
+    facts: int = Field(ge=0)
+    facts_by_status: dict[str, int] = Field(default_factory=dict)
+    jobs_by_status: dict[str, int] = Field(default_factory=dict)
+    queue_depth: int = Field(ge=0)
+    pending_episodes: int = Field(ge=0)
+    failed_episodes: int = Field(ge=0)
+    rejected_claims: int = Field(ge=0)
+    estimated_tokens: int = Field(ge=0)
+    corrections_by_extractor: dict[str, int] = Field(default_factory=dict)
+    projection_version: int = Field(ge=1, default=1)
+
+
 class OnStale(StrEnum):
     FLAG = "flag"
     RAISE = "raise"

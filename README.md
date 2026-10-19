@@ -2,7 +2,7 @@
 
 **Memory that knows its tenses.** Embedded, deterministic memory that AI agents can safely act on.
 
-> Status: pre-alpha. The deterministic API can set facts and render fenced `context()`. `context(query=...)` and `search()` rank by FTS (optional embeddings). `add()` plus `flush()`, `add(..., wait=True)`, or `context(..., wait=)` runs extract jobs through `FakeExtractor` or any `LLMProvider`. `AsyncMemory` mirrors the sync API.
+> Status: pre-alpha. The deterministic API can set facts and render fenced `context()`. `context(query=...)` and `search()` rank by FTS (optional embeddings). `add()` plus `flush()`, `add(..., wait=True)`, or `context(..., wait=)` runs extract jobs through `FakeExtractor` or any `LLMProvider`. `AsyncMemory` mirrors the sync API. A `tensemem` CLI inspects state, history, search, and jobs. `backup()`, `export_jsonl` / `import_jsonl`, `rebuild()`, `stats()`, and hooks cover durability and ops.
 
 ## The problem
 
@@ -38,13 +38,22 @@ mem.correct(bangalore.id)  # restores the value it displaced ("Delhi")
 ctx = mem.context(user_id="u1", query="where did I live", max_tokens=200)
 print(ctx.text)  # fenced Markdown; ctx.freshness.is_current; ctx.debug for scores
 hits = mem.search(user_id="u1", query="live")
+mem.stats(user_id="u1")
+mem.backup("tensemem.bak.db")
+```
+
+```bash
+tensemem inspect --user u1
+tensemem history --user u1 lives_in
+tensemem search --user u1 "where did I live"
+tensemem jobs
 ```
 
 `mem.add(user_id, text)` writes the episode and an extract job in one transaction. Secrets in that text are redacted with detect-secrets before they are stored or sent to a model. Pass `llm=` to process jobs on a background thread (`AsyncMemory` uses an asyncio task). `flush()`, `add(..., wait=True)`, or `context(..., wait=seconds)` wait until due jobs finish, preferring that scope. If extract has not finished, `context()` still includes a hot buffer of unprocessed user messages. Consecutive queued messages in one scope share one extract call. Recalled `context()` blocks are stripped before extract; operations whose evidence is not a verbatim quote from the remaining user text are dropped. Empty leftover messages are skipped without an LLM call. Dead jobs can be dismissed or retried. Tests use `FakeExtractor`. Optional extras: `tensemem[openai]`, `tensemem[anthropic]`, `tensemem[ollama]` (`OllamaProvider`, local), `tensemem[litellm]` (`LiteLLMProvider`, any routed model), and `tensemem[local]` (FastEmbed). Pass `embedder=` to store vectors in the background and boost `search()` / `context(query=)`. Temporal questions (`"where did I live before"`) and `include_history=True` include superseded values. Weak fact matches fall back to episode snippets. `fmt="json"` or `"xml"` changes the renderer.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and workflow, and [docs/adr](docs/adr) for the design decisions behind the engine. Labeled extract cases live in `tests/golden/`; `pytest tests/golden` scores `FakeExtractor`, and `python -m tensemem.eval` prints precision and recall.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and workflow, [docs/](docs/) for the docs site (quickstart, concepts, API, CLI, ops), and [docs/adr](docs/adr) for the design decisions behind the engine. Labeled extract cases live in `tests/golden/`; `pytest tests/golden` scores `FakeExtractor`, and `python -m tensemem.eval` prints precision and recall. Preview docs with `uvx mkdocs serve`.
 
 ## License
 

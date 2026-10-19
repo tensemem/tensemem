@@ -86,6 +86,14 @@ def get_episode(conn: sqlite3.Connection, episode_id: int) -> sqlite3.Row | None
     return conn.execute("SELECT * FROM episodes WHERE id = ?", (episode_id,)).fetchone()
 
 
+def list_episodes(conn: sqlite3.Connection, scope_id: int) -> tuple[sqlite3.Row, ...]:
+    rows = conn.execute(
+        "SELECT * FROM episodes WHERE scope_id = ? ORDER BY id",
+        (scope_id,),
+    ).fetchall()
+    return tuple(rows)
+
+
 def set_episode_status(conn: sqlite3.Connection, episode_id: int, status: EpisodeStatus) -> None:
     conn.execute("UPDATE episodes SET status = ? WHERE id = ?", (status.value, episode_id))
 

@@ -10,6 +10,7 @@ unfenced user text (ADR 0007).
 from __future__ import annotations
 
 import sqlite3
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
 from tensemem.core.errors import StaleLeaseError
@@ -52,6 +53,7 @@ from tensemem.storage.sqlite.snapshot import load_snapshot
 
 _ERROR_LIMIT = 500
 EXTRACT_BATCH = 8
+Emit = Callable[[str, Mapping[str, object]], None]
 
 
 @dataclass(frozen=True)
@@ -90,6 +92,7 @@ def process_one(
     embedder: Embedder | None = None,
     prefer_scope_id: int | None = None,
     batch_size: int = EXTRACT_BATCH,
+    emit: Emit | None = None,
 ) -> bool:
     """Lease and finish one extract batch or embed job. False if nothing was due."""
     if provider is not None and _process_extract(
@@ -98,10 +101,11 @@ def process_one(
         prefer_scope_id=prefer_scope_id,
         batch_size=batch_size,
         enqueue_embed=embedder is not None,
+        emit=emit,
     ):
         return True
     if embedder is not None:
-        return _process_embed(db, embedder, prefer_scope_id=prefer_scope_id)
+        return _process_embed(db, embedder, prefer_scope_id=prefer_scope_id, emit=emit)
     return False
 
 
@@ -112,6 +116,7 @@ def _process_extract(
     prefer_scope_id: int | None,
     batch_size: int,
     enqueue_embed: bool,
+    emit: Emit | None,
 ) -> bool:
     claim = db.transaction(
         lambda conn: _claim(
@@ -130,7 +135,7 @@ def _process_extract(
             [{"role": "user", "content": leased.combined}],
         )
     except Exception as exc:
-        _fail(db, leased, exc)
+        _fail(db, leased, exc, emit=emit)
         return True
     ops = keep_ops(result.ops, leased.combined)
 
@@ -159,7 +164,17 @@ def _process_extract(
     except StaleLeaseError:
         return True
     except Exception as exc:
-        _fail(db, leased, exc)
+        _fail(db, leased, exc, emit=emit)
+        return True
+    if emit is not None:
+        emit(
+            "extraction",
+            {
+                "scope_id": leased.scope.id,
+                "jobs": len(leased.items),
+                "ops": len(ops),
+            },
+        )
     return True
 
 
@@ -227,7 +242,9 @@ def _claim(
     )
 
 
-def _fail(db: SqliteDatabase, leased: _Leased, exc: BaseException) -> None:
+def _fail(
+    db: SqliteDatabase, leased: _Leased, exc: BaseException, *, emit: Emit | None = None
+) -> None:
     error = str(exc) or type(exc).__name__
     message = error[:_ERROR_LIMIT]
     provider_error = isinstance(exc, ProviderError)
@@ -247,6 +264,15 @@ def _fail(db: SqliteDatabase, leased: _Leased, exc: BaseException) -> None:
             db.transaction(write)
         except StaleLeaseError:
             continue
+    if emit is not None:
+        emit(
+            "job_failed",
+            {
+                "scope_id": leased.scope.id,
+                "jobs": len(leased.items),
+                "error": message,
+            },
+        )
 
 
 def _apply_extracted(
@@ -288,6 +314,7 @@ def _process_embed(
     embedder: Embedder,
     *,
     prefer_scope_id: int | None,
+    emit: Emit | None = None,
 ) -> bool:
     def claim(conn: sqlite3.Connection) -> JobView | None:
         return lease_next(conn, now=db.now(), prefer_scope_id=prefer_scope_id, kind=JobKind.EMBED)
@@ -311,6 +338,8 @@ def _process_embed(
             db.transaction(failed)
         except StaleLeaseError:
             return True
+        if emit is not None:
+            emit("job_failed", {"job_id": job.id, "kind": "embed", "error": error})
         return True
 
     def write(conn: sqlite3.Connection) -> None:

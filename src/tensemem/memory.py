@@ -6,13 +6,14 @@ import asyncio
 import sqlite3
 import threading
 import time
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from contextlib import suppress
 from pathlib import Path
 
 from tensemem.core.clock import Clock, utc_now
 from tensemem.core.context import attach_hot_buffer, count_tokens, pack_facts
 from tensemem.core.errors import UnknownFactError, UnknownPredicateError
+from tensemem.core.explicit import parse_explicit_ops
 from tensemem.core.models import (
     AddResult,
     Cardinality,
@@ -29,6 +30,7 @@ from tensemem.core.models import (
     JobKind,
     JobStatus,
     JobView,
+    MemoryStats,
     Mutation,
     OnStale,
     OpKind,
@@ -42,6 +44,8 @@ from tensemem.core.models import (
 from tensemem.core.normalize import normalize_key, normalize_value
 from tensemem.core.ontology import Ontology
 from tensemem.core.resolver import IncomingOp, resolve
+from tensemem.hooks import Hook
+from tensemem.hooks import emit as emit_hooks
 from tensemem.pipeline.normalize import normalize_ops
 from tensemem.pipeline.policy import apply_policy
 from tensemem.pipeline.snapshot import ExtractSnapshot, load_extract_snapshot
@@ -58,7 +62,13 @@ from tensemem.storage.sqlite.entities import (
     resolve_entity,
     subject_label,
 )
-from tensemem.storage.sqlite.episodes import advance_watermark, insert_episode, list_hot_buffer
+from tensemem.storage.sqlite.episodes import (
+    advance_watermark,
+    insert_episode,
+    list_episodes,
+    list_hot_buffer,
+)
+from tensemem.storage.sqlite.export import dump_scope, parse_jsonl
 from tensemem.storage.sqlite.facts import (
     ApplyContext,
     apply_mutations,
@@ -70,7 +80,13 @@ from tensemem.storage.sqlite.jobs import dismiss as dismiss_job
 from tensemem.storage.sqlite.jobs import enqueue, get_job, has_due_or_leased, list_jobs
 from tensemem.storage.sqlite.jobs import retry as retry_job
 from tensemem.storage.sqlite.meta import get_fence_tag
-from tensemem.storage.sqlite.reads import forget_scope, read_explain, read_history, read_state
+from tensemem.storage.sqlite.reads import (
+    forget_scope,
+    read_explain,
+    read_history,
+    read_state,
+    wipe_projection,
+)
 from tensemem.storage.sqlite.registry import get_predicate, register_predicate
 from tensemem.storage.sqlite.retrieve import assemble_context, assemble_search
 from tensemem.storage.sqlite.scopes import get_or_create_scope, get_scope, get_scope_by_id
@@ -80,6 +96,7 @@ from tensemem.storage.sqlite.snapshot import (
     load_snapshot,
     to_fact_view,
 )
+from tensemem.storage.sqlite.stats import load_stats
 
 _WORKER_IDLE = 0.05
 
@@ -96,11 +113,13 @@ class Memory:
         embedder: Embedder | None = None,
         batch_size: int = EXTRACT_BATCH,
         start_worker: bool = True,
+        hooks: Sequence[Hook] | None = None,
     ) -> None:
         self._db = SqliteDatabase(path, clock=clock)
         self._llm = llm
         self._embedder = embedder
         self._batch_size = batch_size
+        self._hooks: list[Hook] = list(hooks or ())
         self._stop = threading.Event()
         self._wake = threading.Event()
         self._worker: threading.Thread | None = None
@@ -203,6 +222,10 @@ class Memory:
             return AddResult(seq=seq, episode_ids=(public_id,), job_id=str(job_id))
 
         result = self._db.transaction(write)
+        self._emit(
+            "add",
+            {"user_id": user_id, "seq": result.seq, "job_id": result.job_id or ""},
+        )
         self._wake.set()
         if wait:
             self.flush(timeout=timeout, job_id=result.job_id)
@@ -269,6 +292,7 @@ class Memory:
             embedder=self._embedder,
             prefer_scope_id=prefer_scope_id,
             batch_size=self._batch_size,
+            emit=self._emit,
         )
 
     def _run_worker(self) -> None:
@@ -315,6 +339,18 @@ class Memory:
     def retry_job(self, job_id: str) -> JobView:
         """Requeue a DEAD job."""
         return self._db.transaction(lambda conn: retry_job(conn, job_id, now=self._db.now()))
+
+    def dismiss_dead_jobs(
+        self,
+        user_id: str | None = None,
+        *,
+        agent_id: str = "",
+        namespace: str = "default",
+    ) -> tuple[JobView, ...]:
+        """Dismiss every DEAD job, optionally for one scope."""
+        listed = self.jobs(user_id, agent_id=agent_id, namespace=namespace)
+        dead = [job for job in listed if job.status is JobStatus.DEAD]
+        return tuple(self.dismiss_job(job.id) for job in dead)
 
     def set(
         self,
@@ -658,19 +694,25 @@ class Memory:
             fact = get_fact(conn, fact_id)
             if fact is None:
                 raise UnknownFactError(f"unknown fact: {fact_id}")
+            row = load_fact_view(conn, fact_id)
+            if row is None:
+                raise UnknownFactError(f"unknown fact: {fact_id}")
             scope = get_scope_by_id(conn, int(fact["scope_id"]))
             if scope is None:
                 raise UnknownFactError(f"unknown fact: {fact_id}")
+            view = to_fact_view(row)
             now = self._db.now()
-            content = note or f"DENY {fact_id}"
-            seq, public_id = insert_episode(conn, scope_id=scope.id, content=content, now=now)
+            pieces = [f"DENY {view.subject}.{view.predicate}={view.object}"]
+            if replacement is not None:
+                pieces.append(f"SET {view.subject}.{view.predicate}={replacement}")
+            if note:
+                pieces.append(f"NOTE {note}")
+            seq, public_id = insert_episode(
+                conn, scope_id=scope.id, content="; ".join(pieces), now=now
+            )
             mark_rejected(conn, fact, episode_id=seq, recorded_seq=seq, now=now)
             restore_displaced(conn, int(fact["id"]), episode_id=seq, now=now)
             if replacement is not None:
-                row = load_fact_view(conn, fact_id)
-                if row is None:
-                    raise UnknownFactError(f"unknown fact: {fact_id}")
-                view = to_fact_view(row)
                 op = _op(view.subject, view.predicate, replacement, OpKind.SET)
                 _apply_ops(conn, scope, (op,), episode_id=seq, now=now)
             advance_watermark(conn, scope.id)
@@ -693,6 +735,152 @@ class Memory:
                 forget_scope(conn, scope.id)
 
         self._db.transaction(wipe)
+        self._emit("forget", {"user_id": user_id})
+
+    def backup(self, dest: str | Path) -> None:
+        """Copy the open database to ``dest`` (SQLite online backup)."""
+        self._db.backup_to(dest)
+        self._emit("backup", {"dest": str(dest)})
+
+    def stats(
+        self,
+        user_id: str | None = None,
+        *,
+        agent_id: str = "",
+        namespace: str = "default",
+    ) -> MemoryStats:
+        """Queue depth, fact counts, and a character/4 token estimate."""
+        if user_id is None:
+            return self._db.read(lambda conn: load_stats(conn, None))
+        key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
+        return self._db.read(lambda conn: load_stats(conn, get_scope(conn, key)))
+
+    def export_jsonl(
+        self,
+        user_id: str,
+        *,
+        agent_id: str = "",
+        namespace: str = "default",
+    ) -> str:
+        """Predicates plus episodes for ``user_id``, one JSON object per line."""
+        key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
+
+        def dump(conn: sqlite3.Connection) -> str:
+            scope = get_scope(conn, key)
+            if scope is None:
+                return ""
+            return dump_scope(conn, scope)
+
+        return self._db.read(dump)
+
+    def import_jsonl(
+        self,
+        user_id: str,
+        source: str | Path,
+        *,
+        agent_id: str = "",
+        namespace: str = "default",
+    ) -> int:
+        """Replay a JSONL dump via ``register_predicate``, ``set``/``add``, and ``add()``.
+
+        Public ids are new. Corrections survive a bit-copy ``backup()``, not this
+        portable replay, unless the dump still contains the denied value only as
+        a later episode the resolver would drop.
+        """
+        text = Path(source).read_text(encoding="utf-8") if _looks_like_path(source) else str(source)
+        applied = 0
+        for record in parse_jsonl(text):
+            kind = str(record.get("type", ""))
+            if kind == "predicate":
+                name = str(record.get("name", "")).strip()
+                if not name:
+                    continue
+                self.register_predicate(
+                    name,
+                    cardinality=Cardinality(str(record.get("cardinality", "ONE"))),
+                    description=str(record.get("description", "")),
+                    pinned=bool(record.get("pinned", False)),
+                )
+                applied += 1
+            elif kind == "episode":
+                content = str(record.get("content", ""))
+                if str(record.get("kind")) == EpisodeKind.EXPLICIT_OP.value:
+                    ops = parse_explicit_ops(content)
+                    if ops:
+                        self._commit(user_id, ops, agent_id=agent_id, namespace=namespace)
+                        applied += 1
+                elif content.strip():
+                    self.add(user_id, content, agent_id=agent_id, namespace=namespace)
+                    applied += 1
+        self._emit("import", {"user_id": user_id, "records": applied})
+        return applied
+
+    def rebuild(
+        self,
+        user_id: str,
+        *,
+        agent_id: str = "",
+        namespace: str = "default",
+        wait: bool = False,
+        timeout: float = 30.0,
+    ) -> int:
+        """Wipe the fact projection and replay episodes. Returns the new version.
+
+        Explicit ops are applied in the same transaction. Message episodes are
+        re-queued for extract. Rejected claims stay, so corrections survive.
+        """
+        key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
+
+        def replay(conn: sqlite3.Connection) -> int:
+            scope = get_scope(conn, key)
+            if scope is None:
+                return 0
+            now = self._db.now()
+            episodes = list_episodes(conn, scope.id)
+            wipe_projection(conn, scope.id)
+            scope = get_scope(conn, key)
+            if scope is None:
+                return 0
+            for episode in episodes:
+                kind = EpisodeKind(str(episode["kind"]))
+                seq = int(episode["id"])
+                if kind is EpisodeKind.EXPLICIT_OP:
+                    ops = parse_explicit_ops(str(episode["content"]))
+                    if ops:
+                        _apply_ops(
+                            conn,
+                            scope,
+                            ops,
+                            episode_id=seq,
+                            now=now,
+                            enqueue_embed=self._embedder is not None,
+                        )
+                elif kind is EpisodeKind.MESSAGE:
+                    enqueue(
+                        conn,
+                        kind=JobKind.EXTRACT,
+                        scope_id=scope.id,
+                        now=now,
+                        episode_id=seq,
+                    )
+            advance_watermark(conn, scope.id)
+            refreshed = get_scope(conn, key)
+            return 1 if refreshed is None else refreshed.projection_version
+
+        version = self._db.transaction(replay)
+        self._emit("rebuild", {"user_id": user_id, "projection_version": version})
+        if wait and version > 0 and self._llm is not None:
+            self.flush(timeout=timeout)
+        elif self._embedder is not None:
+            self._wake.set()
+        return version
+
+    def on(self, hook: Hook) -> None:
+        """Register an extra ``hook(event, payload)`` callback."""
+        self._hooks.append(hook)
+
+    def _emit(self, name: str, payload: Mapping[str, object]) -> None:
+        emit_hooks(self._hooks, name, payload)
 
     def _commit(
         self,
@@ -721,9 +909,21 @@ class Memory:
             return AddResult(seq=seq, episode_ids=(public_id,))
 
         result = self._db.transaction(write)
+        self._emit("commit", {"user_id": user_id, "seq": result.seq, "ops": len(ops)})
         if self._embedder is not None:
             self._wake.set()
         return result
+
+
+def _looks_like_path(source: str | Path) -> bool:
+    if isinstance(source, Path):
+        return True
+    if "\n" in source or source.lstrip().startswith("{"):
+        return False
+    try:
+        return Path(source).is_file()
+    except OSError:
+        return False
 
 
 def caught_up(freshness: Freshness, min_seq: int | None) -> bool:
@@ -837,6 +1037,7 @@ class AsyncMemory:
         llm: LLMProvider | None = None,
         embedder: Embedder | None = None,
         batch_size: int = EXTRACT_BATCH,
+        hooks: Sequence[Hook] | None = None,
     ) -> None:
         self._sync = Memory(
             path,
@@ -845,6 +1046,7 @@ class AsyncMemory:
             embedder=embedder,
             batch_size=batch_size,
             start_worker=False,
+            hooks=hooks,
         )
         self._task: asyncio.Task[None] | None = None
         self._wake = asyncio.Event()
@@ -1133,3 +1335,76 @@ class AsyncMemory:
 
     async def unfence(self, text: str) -> str:
         return await asyncio.to_thread(self._sync.unfence, text)
+
+    async def backup(self, dest: str | Path) -> None:
+        await asyncio.to_thread(self._sync.backup, dest)
+
+    async def stats(
+        self,
+        user_id: str | None = None,
+        *,
+        agent_id: str = "",
+        namespace: str = "default",
+    ) -> MemoryStats:
+        return await asyncio.to_thread(
+            self._sync.stats, user_id, agent_id=agent_id, namespace=namespace
+        )
+
+    async def export_jsonl(
+        self,
+        user_id: str,
+        *,
+        agent_id: str = "",
+        namespace: str = "default",
+    ) -> str:
+        return await asyncio.to_thread(
+            self._sync.export_jsonl, user_id, agent_id=agent_id, namespace=namespace
+        )
+
+    async def import_jsonl(
+        self,
+        user_id: str,
+        source: str | Path,
+        *,
+        agent_id: str = "",
+        namespace: str = "default",
+    ) -> int:
+        return await asyncio.to_thread(
+            self._sync.import_jsonl,
+            user_id,
+            source,
+            agent_id=agent_id,
+            namespace=namespace,
+        )
+
+    async def rebuild(
+        self,
+        user_id: str,
+        *,
+        agent_id: str = "",
+        namespace: str = "default",
+        wait: bool = False,
+        timeout: float = 30.0,
+    ) -> int:
+        return await asyncio.to_thread(
+            self._sync.rebuild,
+            user_id,
+            agent_id=agent_id,
+            namespace=namespace,
+            wait=wait,
+            timeout=timeout,
+        )
+
+    async def dismiss_dead_jobs(
+        self,
+        user_id: str | None = None,
+        *,
+        agent_id: str = "",
+        namespace: str = "default",
+    ) -> tuple[JobView, ...]:
+        return await asyncio.to_thread(
+            self._sync.dismiss_dead_jobs, user_id, agent_id=agent_id, namespace=namespace
+        )
+
+    def on(self, hook: Hook) -> None:
+        self._sync.on(hook)

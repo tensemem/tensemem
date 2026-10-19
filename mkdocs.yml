@@ -1,0 +1,13 @@
+site_name: TenseMem
+site_description: Memory that knows its tenses
+repo_url: https://github.com/tensemem/tensemem
+theme:
+  name: mkdocs
+nav:
+  - Home: index.md
+  - Quickstart: quickstart.md
+  - Concepts: concepts.md
+  - API: api.md
+  - CLI: cli.md
+  - Operations: ops.md
+  - Architecture decisions: adr/README.md

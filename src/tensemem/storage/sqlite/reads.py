@@ -80,6 +80,72 @@ def read_explain(conn: sqlite3.Connection, row: sqlite3.Row) -> ExplainResult:
     )
 
 
+def wipe_projection(conn: sqlite3.Connection, scope_id: int) -> None:
+    """Delete facts and jobs for ``scope_id``; keep episodes, entities, and claims.
+
+    ``rebuild()`` calls this inside the same transaction that replays the log, so
+    readers never observe a half-rebuilt projection.
+    """
+    rows = conn.execute(
+        """
+        SELECT f.id, f.subject_id, f.object_text, p.name AS predicate
+        FROM facts f
+        JOIN predicates p ON p.id = f.predicate_id
+        WHERE f.scope_id = ?
+        """,
+        (scope_id,),
+    ).fetchall()
+    for row in rows:
+        text = search_text(
+            subject_label(conn, int(row["subject_id"])),
+            row["predicate"],
+            row["object_text"],
+        )
+        unindex_fact(conn, int(row["id"]), text)
+    conn.execute(
+        """
+        DELETE FROM embeddings
+        WHERE owner_kind = 'fact' AND owner_id IN (
+          SELECT id FROM facts WHERE scope_id = ?
+        )
+        """,
+        (scope_id,),
+    )
+    conn.execute(
+        """
+        DELETE FROM fact_edges WHERE src_fact_id IN (
+          SELECT id FROM facts WHERE scope_id = ?
+        )
+        """,
+        (scope_id,),
+    )
+    conn.execute(
+        """
+        DELETE FROM fact_events WHERE fact_id IN (
+          SELECT id FROM facts WHERE scope_id = ?
+        )
+        """,
+        (scope_id,),
+    )
+    conn.execute("DELETE FROM facts WHERE scope_id = ?", (scope_id,))
+    conn.execute("DELETE FROM jobs WHERE scope_id = ?", (scope_id,))
+    conn.execute(
+        """
+        UPDATE episodes SET status = 'PENDING'
+        WHERE scope_id = ? AND kind = 'message' AND status <> 'DELETED'
+        """,
+        (scope_id,),
+    )
+    conn.execute(
+        """
+        UPDATE scopes
+        SET applied_seq = 0, projection_version = projection_version + 1
+        WHERE id = ?
+        """,
+        (scope_id,),
+    )
+
+
 def forget_scope(conn: sqlite3.Connection, scope_id: int) -> None:
     """Hard-delete a scope and the rows that belong to it."""
     rows = conn.execute(
