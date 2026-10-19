@@ -18,7 +18,6 @@ _CONFIRMATIONS = frozenset(
         "still true",
         "that's right",
         "that is right",
-        "thats right",
     }
 )
 
