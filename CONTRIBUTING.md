@@ -23,7 +23,7 @@ uv run pytest
 uvx codespell --skip="*.lock,.git,uv.lock" --ignore-words-list="tensemem"
 ```
 
-The `tensemem` CLI (`python -m tensemem --help`) reads a SQLite file; it does not start the extract worker. `tensemem bench` is the exception: it runs TenseBench from JSONL and does not open a database. Docs live in `docs/` with `mkdocs.yml` at the repo root (`uvx mkdocs serve` to preview).
+The `tensemem` CLI (`python -m tensemem --help`) reads a SQLite file; it does not start the extract worker. `tensemem bench` is the exception: it runs TenseBench from JSONL and does not open a database. Docs live in `docs/` with `mkdocs.yml` at the repo root (`uvx mkdocs serve` to preview). Property tests live in `tests/property/` (Hypothesis, 40 examples in CI; `HYPOTHESIS_PROFILE=dev` for a longer run).
 
 Default pytest never calls a model. To run the live extract locally after `uv sync --extra openai`:
 
