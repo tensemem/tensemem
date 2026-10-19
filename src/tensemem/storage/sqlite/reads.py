@@ -11,7 +11,9 @@ from tensemem.core.models import (
     FactStatus,
     Scope,
 )
+from tensemem.storage.sqlite.embeddings import delete_scope_embeddings
 from tensemem.storage.sqlite.entities import subject_label
+from tensemem.storage.sqlite.episodes import unindex_episode
 from tensemem.storage.sqlite.facts import search_text, unindex_fact
 from tensemem.storage.sqlite.snapshot import freshness_for, list_facts, to_fact_view
 
@@ -96,6 +98,12 @@ def forget_scope(conn: sqlite3.Connection, scope_id: int) -> None:
             row["object_text"],
         )
         unindex_fact(conn, int(row["id"]), text)
+    episodes = conn.execute(
+        "SELECT id, content FROM episodes WHERE scope_id = ?", (scope_id,)
+    ).fetchall()
+    for episode in episodes:
+        unindex_episode(conn, int(episode["id"]), str(episode["content"]))
+    delete_scope_embeddings(conn, scope_id)
     conn.execute(
         """
         DELETE FROM fact_edges WHERE src_fact_id IN (

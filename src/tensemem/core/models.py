@@ -221,6 +221,9 @@ class JobView(BaseModel):
     lease_until: str | None = None
     last_error: str | None = None
     episode_id: int | None = None
+    owner_kind: str | None = None
+    owner_id: int | None = None
+    embed_text: str | None = None
 
 
 class FactView(BaseModel):
@@ -241,6 +244,7 @@ class FactView(BaseModel):
     recorded_at: str
     recorded_seq: int = Field(ge=0)
     cardinality: Cardinality = Cardinality.ONE
+    pinned: bool = False
 
 
 class FactEventView(BaseModel):
@@ -308,6 +312,48 @@ class ExplainResult(BaseModel):
     superseded_by: str | None = None
 
 
+class ContextFormat(StrEnum):
+    MARKDOWN = "markdown"
+    JSON = "json"
+    XML = "xml"
+
+
+class ContextDebugItem(BaseModel):
+    """Why one packed item was included (design §11.4)."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    id: str
+    kind: Literal["fact", "episode", "hot"]
+    score: float = 0.0
+    relevance: float = 0.0
+    recency: float = 0.0
+    reason: str = ""
+
+
+class SearchHit(BaseModel):
+    """One ranked fact or episode from ``Memory.search``."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    kind: Literal["fact", "episode"]
+    id: str
+    text: str
+    score: float = Field(ge=0.0)
+    status: FactStatus | None = None
+    predicate: str | None = None
+
+
+class SearchResult(BaseModel):
+    """Ranked facts and episodes plus the freshness of that snapshot."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    hits: tuple[SearchHit, ...] = ()
+    freshness: Freshness
+    debug: tuple[ContextDebugItem, ...] = ()
+
+
 class ContextResult(BaseModel):
     """Rendered prompt block from ``Memory.context``."""
 
@@ -317,6 +363,7 @@ class ContextResult(BaseModel):
     facts_used: tuple[str, ...] = ()
     token_count: int = Field(ge=0)
     freshness: Freshness
+    debug: tuple[ContextDebugItem, ...] = ()
 
 
 class OnStale(StrEnum):

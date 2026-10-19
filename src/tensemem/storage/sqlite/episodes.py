@@ -46,7 +46,20 @@ def insert_episode(
             status.value,
         ),
     ).fetchone()
-    return int(row["id"]), public_id
+    episode_id = int(row["id"])
+    index_episode(conn, episode_id, content)
+    return episode_id, public_id
+
+
+def index_episode(conn: sqlite3.Connection, episode_id: int, content: str) -> None:
+    conn.execute("INSERT INTO episodes_fts(rowid, content) VALUES (?, ?)", (episode_id, content))
+
+
+def unindex_episode(conn: sqlite3.Connection, episode_id: int, content: str) -> None:
+    conn.execute(
+        "INSERT INTO episodes_fts(episodes_fts, rowid, content) VALUES ('delete', ?, ?)",
+        (episode_id, content),
+    )
 
 
 def list_hot_buffer(

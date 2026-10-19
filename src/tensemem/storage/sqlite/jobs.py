@@ -32,12 +32,13 @@ def enqueue(
     now: str,
     episode_id: int | None = None,
     payload: dict[str, object] | None = None,
+    idempotency_key: str | None = None,
 ) -> int:
     """Insert a QUEUED job. Reuse the row when the idempotency key already exists."""
     body = dict(payload or {})
     if episode_id is not None:
         body.setdefault("episode_id", episode_id)
-    key = _idempotency_key(kind, scope_id, episode_id)
+    key = idempotency_key or _idempotency_key(kind, scope_id, episode_id)
     existing = conn.execute("SELECT id FROM jobs WHERE idempotency_key = ?", (key,)).fetchone()
     if existing is not None:
         return int(existing["id"])
@@ -52,12 +53,33 @@ def enqueue(
     return int(row["id"])
 
 
+def enqueue_embed(
+    conn: sqlite3.Connection,
+    *,
+    scope_id: int,
+    now: str,
+    owner_kind: str,
+    owner_id: int,
+    text: str,
+) -> int:
+    """Queue a background embed job. Idempotent per owner row."""
+    return enqueue(
+        conn,
+        kind=JobKind.EMBED,
+        scope_id=scope_id,
+        now=now,
+        payload={"owner_kind": owner_kind, "owner_id": owner_id, "text": text},
+        idempotency_key=f"embed:{owner_kind}:{owner_id}",
+    )
+
+
 def lease_next(
     conn: sqlite3.Connection,
     *,
     now: str,
     lease_seconds: float = LEASE_SECONDS,
     prefer_scope_id: int | None = None,
+    kind: JobKind | None = None,
 ) -> JobView | None:
     """Claim the next ready job, or None if the circuit is open or nothing is due.
 
@@ -68,11 +90,17 @@ def lease_next(
         return None
     _expire_leases(conn, now)
     prefer = -1 if prefer_scope_id is None else prefer_scope_id
+    extra = "" if kind is None else " AND j.kind = ?"
+    params: list[object] = [now]
+    if kind is not None:
+        params.append(kind.value)
+    params.append(prefer)
     row = conn.execute(
-        """
+        f"""
         SELECT j.id FROM jobs j
         WHERE j.status = 'QUEUED'
           AND j.next_run_at <= ?
+          {extra}
           AND NOT EXISTS (
             SELECT 1 FROM jobs held
             WHERE held.scope_id = j.scope_id AND held.status = 'LEASED'
@@ -86,7 +114,7 @@ def lease_next(
         ORDER BY CASE WHEN j.scope_id = ? THEN 0 ELSE 1 END, j.id
         LIMIT 1
         """,
-        (now, prefer),
+        params,
     ).fetchone()
     if row is None:
         return None
@@ -100,11 +128,18 @@ def lease_batch(
     lease_seconds: float = LEASE_SECONDS,
     prefer_scope_id: int | None = None,
     limit: int = 8,
+    kind: JobKind | None = None,
 ) -> tuple[JobView, ...]:
     """Lease the next ready job plus consecutive due extract jobs in that scope."""
     if limit < 1:
         return ()
-    first = lease_next(conn, now=now, lease_seconds=lease_seconds, prefer_scope_id=prefer_scope_id)
+    first = lease_next(
+        conn,
+        now=now,
+        lease_seconds=lease_seconds,
+        prefer_scope_id=prefer_scope_id,
+        kind=kind,
+    )
     if first is None:
         return ()
     if first.kind is not JobKind.EXTRACT:
@@ -400,6 +435,9 @@ def _to_job(row: sqlite3.Row) -> JobView:
         lease_until=None if row["lease_until"] is None else str(row["lease_until"]),
         last_error=None if row["last_error"] is None else str(row["last_error"]),
         episode_id=None if episode_id is None else int(episode_id),
+        owner_kind=None if payload.get("owner_kind") is None else str(payload["owner_kind"]),
+        owner_id=None if payload.get("owner_id") is None else int(payload["owner_id"]),
+        embed_text=None if payload.get("text") is None else str(payload["text"]),
     )
 
 

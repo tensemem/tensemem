@@ -124,11 +124,11 @@ def test_reopen_is_idempotent(tmp_path: Path) -> None:
     clock = FrozenClock(datetime(2026, 10, 17, 12, 0, 0, tzinfo=UTC))
     with SqliteDatabase(path, clock=clock, read_pool_size=1) as db:
         count = db.read(lambda c: c.execute("SELECT COUNT(*) FROM schema_migrations").fetchone())[0]
-        assert count == 2
+        assert count == 3
 
     with SqliteDatabase(path, clock=clock, read_pool_size=1) as db:
         count = db.read(lambda c: c.execute("SELECT COUNT(*) FROM schema_migrations").fetchone())[0]
-        assert count == 2
+        assert count == 3
         versions = db.read(
             lambda c: [
                 row[0]
@@ -137,7 +137,7 @@ def test_reopen_is_idempotent(tmp_path: Path) -> None:
                 ).fetchall()
             ]
         )
-        assert versions == [1, 2]
+        assert versions == [1, 2, 3]
         assert all(
             row[0] == format_instant(clock())
             for row in db.read(

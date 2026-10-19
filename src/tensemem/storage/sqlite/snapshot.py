@@ -16,7 +16,7 @@ from tensemem.core.models import (
 from tensemem.core.resolver import FactSnap, RejectedClaim, Snapshot
 from tensemem.storage.sqlite.entities import SELF_NAME
 
-_FACT_SELECT = """
+FACT_SELECT = """
 SELECT
   f.id,
   f.public_id,
@@ -33,6 +33,7 @@ SELECT
   f.superseded_by,
   p.name AS predicate,
   p.cardinality AS cardinality,
+  p.pinned AS pinned,
   e.kind AS subject_kind,
   e.canonical_name AS subject_name
 FROM facts f
@@ -44,7 +45,7 @@ JOIN entities e ON e.id = f.subject_id
 def load_snapshot(conn: sqlite3.Connection, scope: Scope, *, episode_seq: int) -> Snapshot:
     """ACTIVE facts and rejected claims for ``resolve()``."""
     fact_rows = conn.execute(
-        _FACT_SELECT + " WHERE f.scope_id = ? AND f.status = 'ACTIVE' ORDER BY f.id",
+        FACT_SELECT + " WHERE f.scope_id = ? AND f.status = 'ACTIVE' ORDER BY f.id",
         (scope.id,),
     ).fetchall()
     claim_rows = conn.execute(
@@ -96,7 +97,7 @@ def list_facts(
     statuses: tuple[FactStatus, ...],
     predicate: str | None = None,
 ) -> list[FactView]:
-    sql = _FACT_SELECT + " WHERE f.scope_id = ? AND f.status IN ({})".format(
+    sql = FACT_SELECT + " WHERE f.scope_id = ? AND f.status IN ({})".format(
         ",".join("?" * len(statuses))
     )
     params: list[object] = [scope_id, *[status.value for status in statuses]]
@@ -109,7 +110,7 @@ def list_facts(
 
 
 def load_fact_view(conn: sqlite3.Connection, public_id: str) -> sqlite3.Row | None:
-    return conn.execute(_FACT_SELECT + " WHERE f.public_id = ?", (public_id,)).fetchone()
+    return conn.execute(FACT_SELECT + " WHERE f.public_id = ?", (public_id,)).fetchone()
 
 
 def freshness_for(conn: sqlite3.Connection, scope: Scope | None) -> Freshness:
@@ -155,6 +156,7 @@ def _to_view(row: sqlite3.Row) -> FactView:
         recorded_at=row["recorded_at"],
         recorded_seq=int(row["recorded_seq"]),
         cardinality=Cardinality(row["cardinality"]),
+        pinned=bool(row["pinned"]),
     )
 
 

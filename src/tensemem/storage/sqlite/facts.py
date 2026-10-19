@@ -516,7 +516,8 @@ def _add_edge(
 
 
 def search_text(subject: str, predicate: str, object_text: str) -> str:
-    return " ".join((subject, predicate, object_text))
+    words = predicate.replace("_", " ")
+    return " ".join((subject, predicate, words, object_text))
 
 
 def index_fact(conn: sqlite3.Connection, fact_id: int, text: str) -> None:

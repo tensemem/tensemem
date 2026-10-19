@@ -16,6 +16,8 @@ from tensemem.core.errors import UnknownFactError, UnknownPredicateError
 from tensemem.core.models import (
     AddResult,
     Cardinality,
+    ContextDebugItem,
+    ContextFormat,
     ContextResult,
     EpisodeKind,
     EpisodeStatus,
@@ -34,6 +36,7 @@ from tensemem.core.models import (
     PredicateSpec,
     Scope,
     ScopeKey,
+    SearchResult,
     StaleMemoryError,
 )
 from tensemem.core.normalize import normalize_key, normalize_value
@@ -43,10 +46,12 @@ from tensemem.pipeline.normalize import normalize_ops
 from tensemem.pipeline.policy import apply_policy
 from tensemem.pipeline.snapshot import ExtractSnapshot, load_extract_snapshot
 from tensemem.pipeline.worker import EXTRACT_BATCH, process_one
+from tensemem.providers.embed.base import Embedder
 from tensemem.providers.llm.base import LLMProvider
 from tensemem.security.fence import strip as strip_fences
 from tensemem.security.fence import wrap as wrap_fence
 from tensemem.storage.sqlite import SqliteDatabase
+from tensemem.storage.sqlite.embeddings import enqueue_episode_embed, enqueue_fact_embeds
 from tensemem.storage.sqlite.entities import (
     SELF_NAME,
     ensure_subject_entity,
@@ -67,8 +72,14 @@ from tensemem.storage.sqlite.jobs import retry as retry_job
 from tensemem.storage.sqlite.meta import get_fence_tag
 from tensemem.storage.sqlite.reads import forget_scope, read_explain, read_history, read_state
 from tensemem.storage.sqlite.registry import get_predicate, register_predicate
+from tensemem.storage.sqlite.retrieve import assemble_context, assemble_search
 from tensemem.storage.sqlite.scopes import get_or_create_scope, get_scope, get_scope_by_id
-from tensemem.storage.sqlite.snapshot import load_fact_view, load_snapshot, to_fact_view
+from tensemem.storage.sqlite.snapshot import (
+    freshness_for,
+    load_fact_view,
+    load_snapshot,
+    to_fact_view,
+)
 
 _WORKER_IDLE = 0.05
 
@@ -82,16 +93,18 @@ class Memory:
         *,
         clock: Clock = utc_now,
         llm: LLMProvider | None = None,
+        embedder: Embedder | None = None,
         batch_size: int = EXTRACT_BATCH,
         start_worker: bool = True,
     ) -> None:
         self._db = SqliteDatabase(path, clock=clock)
         self._llm = llm
+        self._embedder = embedder
         self._batch_size = batch_size
         self._stop = threading.Event()
         self._wake = threading.Event()
         self._worker: threading.Thread | None = None
-        if llm is not None and start_worker:
+        if (llm is not None or embedder is not None) and start_worker:
             self._worker = threading.Thread(
                 target=self._run_worker,
                 name="tensemem-extract-worker",
@@ -106,6 +119,9 @@ class Memory:
 
     def has_provider(self) -> bool:
         return self._llm is not None
+
+    def has_worker(self) -> bool:
+        return self._llm is not None or self._embedder is not None
 
     def stopped(self) -> bool:
         return self._stop.is_set()
@@ -130,12 +146,14 @@ class Memory:
         cardinality: Cardinality = Cardinality.ONE,
         aliases: Sequence[str] = (),
         description: str = "",
+        pinned: bool = False,
     ) -> Predicate:
         spec = PredicateSpec(
             name=name,
             cardinality=cardinality,
             aliases=tuple(aliases),
             description=description,
+            pinned=pinned,
         )
         return self._db.transaction(lambda conn: register_predicate(conn, spec, now=self._db.now()))
 
@@ -190,8 +208,8 @@ class Memory:
         """
         if not self.waiting_for(job_id):
             return
-        if self._llm is None:
-            msg = "flush() needs Memory(..., llm=...)"
+        if self._llm is None and self._embedder is None:
+            msg = "flush() needs Memory(..., llm=...) or embedder="
             raise RuntimeError(msg)
         prefer = self.scope_for_job(job_id) if job_id is not None else None
         deadline = time.monotonic() + timeout
@@ -235,18 +253,18 @@ class Memory:
         return None if job is None else job.scope_id
 
     def process_extract(self, *, prefer_scope_id: int | None = None) -> bool:
-        provider = self._llm
-        if provider is None:
+        if self._llm is None and self._embedder is None:
             return False
         return process_one(
             self._db,
-            provider,
+            self._llm,
+            embedder=self._embedder,
             prefer_scope_id=prefer_scope_id,
             batch_size=self._batch_size,
         )
 
     def _run_worker(self) -> None:
-        if self._llm is None:
+        if self._llm is None and self._embedder is None:
             return
         while not self._stop.is_set():
             try:
@@ -432,6 +450,8 @@ class Memory:
         wait: float = 0.0,
         on_stale: OnStale | str = OnStale.FLAG,
         fence: bool = True,
+        include_history: bool = False,
+        fmt: ContextFormat | str = ContextFormat.MARKDOWN,
         agent_id: str = "",
         namespace: str = "default",
     ) -> ContextResult:
@@ -439,10 +459,24 @@ class Memory:
 
         With ``wait>0``, drain this scope's extract jobs until ``min_seq`` is
         applied (or until the scope is current when ``min_seq`` is omitted).
+        A non-empty ``query`` uses FTS (and optional embeddings) so the right
+        slot wins over whatever was written last.
         """
         key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
         policy = OnStale(on_stale)
-        packed, scope_id = self.pack_context(key, query=query, max_tokens=max_tokens, fence=fence)
+        layout = ContextFormat(fmt)
+
+        def pack() -> tuple[ContextResult, int | None]:
+            return self.pack_context(
+                key,
+                query=query,
+                max_tokens=max_tokens,
+                fence=fence,
+                include_history=include_history,
+                fmt=layout,
+            )
+
+        packed, scope_id = pack()
         if caught_up(packed.freshness, min_seq):
             return packed
         if wait <= 0:
@@ -454,9 +488,7 @@ class Memory:
         deadline = time.monotonic() + wait
         while time.monotonic() < deadline:
             if self.process_extract(prefer_scope_id=scope_id):
-                packed, scope_id = self.pack_context(
-                    key, query=query, max_tokens=max_tokens, fence=fence
-                )
+                packed, scope_id = pack()
                 if caught_up(packed.freshness, min_seq):
                     return packed
                 continue
@@ -465,12 +497,10 @@ class Memory:
                 break
             self._wake.wait(timeout=min(_WORKER_IDLE, remaining))
             self._wake.clear()
-            packed, scope_id = self.pack_context(
-                key, query=query, max_tokens=max_tokens, fence=fence
-            )
+            packed, scope_id = pack()
             if caught_up(packed.freshness, min_seq):
                 return packed
-        packed, _ = self.pack_context(key, query=query, max_tokens=max_tokens, fence=fence)
+        packed, _ = pack()
         if caught_up(packed.freshness, min_seq):
             return packed
         return stale_or_raise(packed, min_seq=min_seq, policy=policy)
@@ -482,8 +512,16 @@ class Memory:
         query: str,
         max_tokens: int,
         fence: bool,
+        include_history: bool = False,
+        fmt: ContextFormat = ContextFormat.MARKDOWN,
     ) -> tuple[ContextResult, int | None]:
         as_of = self._db.now()[:10]
+        now = self._db.now()
+        query_vector = None
+        embed_model = None
+        if self._embedder is not None and query.strip():
+            query_vector = self._embedder.embed([query])[0]
+            embed_model = self._embedder.model
 
         def load(conn: sqlite3.Connection) -> tuple[ContextResult, int | None]:
             scope = get_scope(conn, key)
@@ -501,9 +539,31 @@ class Memory:
                     None if scope is None else scope.id,
                 )
             body_budget = max(max_tokens - reserve, 0)
-            body, ids = pack_facts(facts.facts, as_of=as_of, max_tokens=body_budget, query=query)
             pending = () if scope is None else list_hot_buffer(conn, scope.id)
-            body = attach_hot_buffer(body, pending, max_tokens=body_budget)
+            if scope is None or (
+                not query.strip() and not include_history and fmt is ContextFormat.MARKDOWN
+            ):
+                body, ids = pack_facts(
+                    facts.facts, as_of=as_of, max_tokens=body_budget, query=query
+                )
+                body = attach_hot_buffer(body, pending, max_tokens=body_budget)
+                debug = tuple(
+                    ContextDebugItem(id=fact_id, kind="fact", reason="recency") for fact_id in ids
+                )
+            else:
+                body, ids, debug = assemble_context(
+                    conn,
+                    scope.id,
+                    query,
+                    now=now,
+                    as_of=as_of,
+                    max_tokens=body_budget,
+                    include_history=include_history,
+                    fmt=fmt,
+                    hot=pending,
+                    query_vector=query_vector,
+                    embed_model=embed_model,
+                )
             text = wrap_fence(body, tag) if fence else body
             return (
                 ContextResult(
@@ -511,9 +571,45 @@ class Memory:
                     facts_used=ids,
                     token_count=count_tokens(text),
                     freshness=facts.freshness,
+                    debug=debug,
                 ),
                 None if scope is None else scope.id,
             )
+
+        return self._db.read(load)
+
+    def search(
+        self,
+        user_id: str,
+        query: str,
+        *,
+        limit: int = 10,
+        agent_id: str = "",
+        namespace: str = "default",
+    ) -> SearchResult:
+        """Ranked facts and episodes for ``query`` (FTS, optional embeddings)."""
+        key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
+        now = self._db.now()
+        query_vector = None
+        embed_model = None
+        if self._embedder is not None and query.strip():
+            query_vector = self._embedder.embed([query])[0]
+            embed_model = self._embedder.model
+
+        def load(conn: sqlite3.Connection) -> SearchResult:
+            scope = get_scope(conn, key)
+            if scope is None:
+                return SearchResult(hits=(), freshness=freshness_for(conn, None))
+            hits, debug = assemble_search(
+                conn,
+                scope.id,
+                query,
+                now=now,
+                limit=limit,
+                query_vector=query_vector,
+                embed_model=embed_model,
+            )
+            return SearchResult(hits=hits, freshness=freshness_for(conn, scope), debug=debug)
 
         return self._db.read(load)
 
@@ -609,11 +705,25 @@ class Memory:
             now = self._db.now()
             scope = get_or_create_scope(conn, key, now=now)
             seq, public_id = insert_episode(conn, scope_id=scope.id, content=content, now=now)
-            _apply_ops(conn, scope, ops, episode_id=seq, now=now)
+            _apply_ops(
+                conn,
+                scope,
+                ops,
+                episode_id=seq,
+                now=now,
+                enqueue_embed=self._embedder is not None,
+            )
+            if self._embedder is not None:
+                enqueue_episode_embed(
+                    conn, scope_id=scope.id, now=now, episode_id=seq, text=content
+                )
             advance_watermark(conn, scope.id)
             return AddResult(seq=seq, episode_ids=(public_id,))
 
-        return self._db.transaction(write)
+        result = self._db.transaction(write)
+        if self._embedder is not None:
+            self._wake.set()
+        return result
 
 
 def caught_up(freshness: Freshness, min_seq: int | None) -> bool:
@@ -636,17 +746,20 @@ def _apply_ops(
     *,
     episode_id: int,
     now: str,
+    enqueue_embed: bool = False,
 ) -> None:
     prepared = [_prepare(conn, scope, op, episode_id=episode_id, now=now) for op in ops]
     incoming = [item[0] for item in prepared]
     contexts = [item[1] for item in prepared]
     snapshot = load_snapshot(conn, scope, episode_seq=episode_id)
     mutations = resolve(incoming, snapshot)
-    apply_mutations(
+    results = apply_mutations(
         conn,
         [(mutation, _context_for(mutation, incoming, contexts)) for mutation in mutations],
         now=now,
     )
+    if enqueue_embed:
+        enqueue_fact_embeds(conn, scope_id=scope.id, now=now, results=results)
 
 
 def _op(subject: str, predicate: str, value: str, kind: OpKind) -> ExtractedOp:
@@ -722,9 +835,17 @@ class AsyncMemory:
         *,
         clock: Clock = utc_now,
         llm: LLMProvider | None = None,
+        embedder: Embedder | None = None,
         batch_size: int = EXTRACT_BATCH,
     ) -> None:
-        self._sync = Memory(path, clock=clock, llm=llm, batch_size=batch_size, start_worker=False)
+        self._sync = Memory(
+            path,
+            clock=clock,
+            llm=llm,
+            embedder=embedder,
+            batch_size=batch_size,
+            start_worker=False,
+        )
         self._task: asyncio.Task[None] | None = None
         self._wake = asyncio.Event()
 
@@ -746,7 +867,7 @@ class AsyncMemory:
         await asyncio.to_thread(self._sync.close)
 
     def _ensure_worker(self) -> None:
-        if self._task is not None or not self._sync.has_provider():
+        if self._task is not None or not self._sync.has_worker():
             return
         self._task = asyncio.get_running_loop().create_task(self._run_worker())
 
@@ -815,8 +936,8 @@ class AsyncMemory:
     async def flush(self, timeout: float = 10.0, *, job_id: str | None = None) -> None:
         if not await asyncio.to_thread(self._sync.waiting_for, job_id):
             return
-        if not self._sync.has_provider():
-            msg = "flush() needs AsyncMemory(..., llm=...)"
+        if not self._sync.has_worker():
+            msg = "flush() needs AsyncMemory(..., llm=...) or embedder="
             raise RuntimeError(msg)
         self._ensure_worker()
         prefer = (
@@ -850,13 +971,22 @@ class AsyncMemory:
         wait: float = 0.0,
         on_stale: OnStale | str = OnStale.FLAG,
         fence: bool = True,
+        include_history: bool = False,
+        fmt: ContextFormat | str = ContextFormat.MARKDOWN,
         agent_id: str = "",
         namespace: str = "default",
     ) -> ContextResult:
         key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
         policy = OnStale(on_stale)
+        layout = ContextFormat(fmt)
         packed, scope_id = await asyncio.to_thread(
-            self._sync.pack_context, key, query=query, max_tokens=max_tokens, fence=fence
+            self._sync.pack_context,
+            key,
+            query=query,
+            max_tokens=max_tokens,
+            fence=fence,
+            include_history=include_history,
+            fmt=layout,
         )
         if caught_up(packed.freshness, min_seq):
             return packed
@@ -876,6 +1006,8 @@ class AsyncMemory:
                     query=query,
                     max_tokens=max_tokens,
                     fence=fence,
+                    include_history=include_history,
+                    fmt=layout,
                 )
                 if caught_up(packed.freshness, min_seq):
                     return packed
@@ -885,16 +1017,46 @@ class AsyncMemory:
                 break
             await asyncio.sleep(min(_WORKER_IDLE, remaining))
             packed, scope_id = await asyncio.to_thread(
-                self._sync.pack_context, key, query=query, max_tokens=max_tokens, fence=fence
+                self._sync.pack_context,
+                key,
+                query=query,
+                max_tokens=max_tokens,
+                fence=fence,
+                include_history=include_history,
+                fmt=layout,
             )
             if caught_up(packed.freshness, min_seq):
                 return packed
         packed, _ = await asyncio.to_thread(
-            self._sync.pack_context, key, query=query, max_tokens=max_tokens, fence=fence
+            self._sync.pack_context,
+            key,
+            query=query,
+            max_tokens=max_tokens,
+            fence=fence,
+            include_history=include_history,
+            fmt=layout,
         )
         if caught_up(packed.freshness, min_seq):
             return packed
         return stale_or_raise(packed, min_seq=min_seq, policy=policy)
+
+    async def search(
+        self,
+        user_id: str,
+        query: str,
+        *,
+        limit: int = 10,
+        agent_id: str = "",
+        namespace: str = "default",
+    ) -> SearchResult:
+        return await asyncio.to_thread(
+            self._sync.search,
+            user_id,
+            query,
+            limit=limit,
+            agent_id=agent_id,
+            namespace=namespace,
+        )
 
     async def set(
         self,

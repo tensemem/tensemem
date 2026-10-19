@@ -28,9 +28,15 @@ from tensemem.pipeline.normalize import normalize_ops
 from tensemem.pipeline.policy import apply_policy
 from tensemem.pipeline.prompt import PROMPT_VERSION
 from tensemem.pipeline.snapshot import ExtractSnapshot, load_extract_snapshot
+from tensemem.providers.embed.base import Embedder
 from tensemem.providers.llm.base import LLMProvider, ProviderError
 from tensemem.security.scrub import scrub
 from tensemem.storage.sqlite.database import SqliteDatabase
+from tensemem.storage.sqlite.embeddings import (
+    enqueue_episode_embed,
+    enqueue_fact_embeds,
+    upsert_embedding,
+)
 from tensemem.storage.sqlite.entities import (
     ensure_subject_entity,
     resolve_entity,
@@ -38,7 +44,7 @@ from tensemem.storage.sqlite.entities import (
 )
 from tensemem.storage.sqlite.episodes import get_episode
 from tensemem.storage.sqlite.facts import ApplyContext, apply_mutations
-from tensemem.storage.sqlite.jobs import complete, fail, lease_batch
+from tensemem.storage.sqlite.jobs import complete, fail, lease_batch, lease_next
 from tensemem.storage.sqlite.meta import get_fence_tag
 from tensemem.storage.sqlite.registry import get_predicate
 from tensemem.storage.sqlite.scopes import get_scope_by_id
@@ -79,12 +85,34 @@ def qualifies(content: str) -> bool:
 
 def process_one(
     db: SqliteDatabase,
-    provider: LLMProvider,
+    provider: LLMProvider | None,
     *,
+    embedder: Embedder | None = None,
     prefer_scope_id: int | None = None,
     batch_size: int = EXTRACT_BATCH,
 ) -> bool:
-    """Lease and finish one batch. False if nothing was due."""
+    """Lease and finish one extract batch or embed job. False if nothing was due."""
+    if provider is not None and _process_extract(
+        db,
+        provider,
+        prefer_scope_id=prefer_scope_id,
+        batch_size=batch_size,
+        enqueue_embed=embedder is not None,
+    ):
+        return True
+    if embedder is not None:
+        return _process_embed(db, embedder, prefer_scope_id=prefer_scope_id)
+    return False
+
+
+def _process_extract(
+    db: SqliteDatabase,
+    provider: LLMProvider,
+    *,
+    prefer_scope_id: int | None,
+    batch_size: int,
+    enqueue_embed: bool,
+) -> bool:
     claim = db.transaction(
         lambda conn: _claim(
             conn, now=db.now(), prefer_scope_id=prefer_scope_id, batch_size=batch_size
@@ -115,6 +143,7 @@ def process_one(
             incoming,
             episode_id=leased.items[-1].episode_id,
             now=db.now(),
+            enqueue_embed=enqueue_embed,
         )
         for item in leased.items:
             complete(
@@ -141,7 +170,13 @@ def _claim(
     prefer_scope_id: int | None,
     batch_size: int,
 ) -> _Claim:
-    jobs = lease_batch(conn, now=now, prefer_scope_id=prefer_scope_id, limit=batch_size)
+    jobs = lease_batch(
+        conn,
+        now=now,
+        prefer_scope_id=prefer_scope_id,
+        limit=batch_size,
+        kind=JobKind.EXTRACT,
+    )
     if not jobs:
         return _Claim(leased=None, progressed=False)
     items: list[_Item] = []
@@ -221,6 +256,7 @@ def _apply_extracted(
     *,
     episode_id: int | None,
     now: str,
+    enqueue_embed: bool = False,
 ) -> None:
     if episode_id is None or not incoming:
         return
@@ -229,11 +265,69 @@ def _apply_extracted(
     contexts = [item[1] for item in prepared]
     snapshot = load_snapshot(conn, scope, episode_seq=episode_id)
     mutations = resolve(ops, snapshot)
-    apply_mutations(
+    results = apply_mutations(
         conn,
         [(mutation, _context_for(mutation, ops, contexts)) for mutation in mutations],
         now=now,
     )
+    if enqueue_embed:
+        enqueue_fact_embeds(conn, scope_id=scope.id, now=now, results=results)
+        episode = get_episode(conn, episode_id)
+        if episode is not None:
+            enqueue_episode_embed(
+                conn,
+                scope_id=scope.id,
+                now=now,
+                episode_id=episode_id,
+                text=str(episode["content"]),
+            )
+
+
+def _process_embed(
+    db: SqliteDatabase,
+    embedder: Embedder,
+    *,
+    prefer_scope_id: int | None,
+) -> bool:
+    def claim(conn: sqlite3.Connection) -> JobView | None:
+        return lease_next(conn, now=db.now(), prefer_scope_id=prefer_scope_id, kind=JobKind.EMBED)
+
+    job = db.transaction(claim)
+    if job is None:
+        return False
+    token = job.lease_until
+    if token is None or job.owner_kind is None or job.owner_id is None:
+        return True
+    try:
+        vectors = embedder.embed([job.embed_text or ""])
+        vector = vectors[0]
+    except Exception as exc:
+        error = (str(exc) or type(exc).__name__)[:_ERROR_LIMIT]
+
+        def failed(conn: sqlite3.Connection) -> None:
+            fail(conn, job.id, error, now=db.now(), lease_until=token)
+
+        try:
+            db.transaction(failed)
+        except StaleLeaseError:
+            return True
+        return True
+
+    def write(conn: sqlite3.Connection) -> None:
+        upsert_embedding(
+            conn,
+            owner_kind=job.owner_kind or "fact",
+            owner_id=job.owner_id or 0,
+            model=embedder.model,
+            vector=vector,
+        )
+        complete(conn, job.id, now=db.now(), lease_until=token)
+
+    try:
+        db.transaction(write)
+    except StaleLeaseError:
+        return True
+    return True
 
 
 def _context(
