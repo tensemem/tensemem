@@ -38,7 +38,7 @@ ctx = mem.context(user_id="u1", max_tokens=200)
 print(ctx.text)  # fenced Markdown; ctx.freshness.is_current
 ```
 
-`mem.add(user_id, text)` writes the episode and an extract job in one transaction. Pass `llm=` to process jobs on a background thread; `flush()` or `add(..., wait=True)` waits until due jobs finish. Empty messages are skipped without an LLM call. Dead jobs can be dismissed or retried. Tests use `FakeExtractor`.
+`mem.add(user_id, text)` writes the episode and an extract job in one transaction. Pass `llm=` to process jobs on a background thread; `flush()` or `add(..., wait=True)` waits until due jobs finish. Recalled `context()` blocks are stripped before extract; operations whose evidence is not a verbatim quote from the remaining user text are dropped. Empty leftover messages are skipped without an LLM call. Dead jobs can be dismissed or retried. Tests use `FakeExtractor`.
 
 ## Contributing
 

@@ -178,8 +178,12 @@ def test_supersede_then_reject(db: SqliteDatabase) -> None:
         )[0]
     )
     rejected = db.read(lambda conn: get_fact(conn, denied.public_id or ""))
+    restored = db.read(lambda conn: get_fact(conn, inserted.public_id or ""))
     assert rejected is not None
     assert rejected["status"] == FactStatus.REJECTED
+    assert restored is not None
+    assert restored["status"] == FactStatus.ACTIVE
+    assert restored["superseded_by"] is None
     claims = db.read(
         lambda conn: conn.execute(
             "SELECT object_norm, until_seq FROM rejected_claims WHERE scope_id = ?",

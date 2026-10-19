@@ -1,7 +1,9 @@
 """Lease extract jobs, run the pipeline, complete or fail (Day 17).
 
 The LLM call happens outside the write transaction so a slow provider does not
-block ``set()`` / ``add()``. Empty messages are skipped without a provider call.
+block ``set()`` / ``add()``. Fenced recalled context is stripped first; leftover
+empty messages are skipped without a provider call. Extracted ops need a
+verbatim quote from that unfenced user text (ADR 0007).
 """
 
 from __future__ import annotations
@@ -20,6 +22,7 @@ from tensemem.core.models import (
 )
 from tensemem.core.resolver import IncomingOp, resolve
 from tensemem.pipeline.extractor import extract
+from tensemem.pipeline.guard import keep_ops, user_span
 from tensemem.pipeline.normalize import normalize_ops
 from tensemem.pipeline.policy import apply_policy
 from tensemem.pipeline.prompt import PROMPT_VERSION
@@ -34,6 +37,7 @@ from tensemem.storage.sqlite.entities import (
 from tensemem.storage.sqlite.episodes import get_episode
 from tensemem.storage.sqlite.facts import ApplyContext, apply_mutations
 from tensemem.storage.sqlite.jobs import complete, fail, lease_next
+from tensemem.storage.sqlite.meta import get_fence_tag
 from tensemem.storage.sqlite.registry import get_predicate
 from tensemem.storage.sqlite.scopes import get_scope_by_id
 from tensemem.storage.sqlite.snapshot import load_snapshot
@@ -79,9 +83,10 @@ def process_one(db: SqliteDatabase, provider: LLMProvider) -> bool:
     except Exception as exc:
         _fail(db, leased, exc)
         return True
+    ops = keep_ops(result.ops, leased.content)
 
     def write(conn: sqlite3.Connection) -> None:
-        incoming = normalize_ops(conn, leased.scope, result.ops, now=db.now())
+        incoming = normalize_ops(conn, leased.scope, ops, now=db.now())
         incoming = apply_policy(conn, incoming, reference_time=leased.reference_time, now=db.now())
         _apply_extracted(
             conn, leased.scope, incoming, episode_id=leased.job.episode_id, now=db.now()
@@ -117,7 +122,7 @@ def _claim(conn: sqlite3.Connection, *, now: str) -> _Claim:
     if episode is None:
         fail(conn, job.id, "missing episode", now=now, lease_until=token)
         return _Claim(leased=None, progressed=True)
-    content = str(episode["content"])
+    content = user_span(str(episode["content"]), get_fence_tag(conn))
     if not qualifies(content):
         complete(conn, job.id, now=now, lease_until=token, episode_status=EpisodeStatus.SKIPPED)
         return _Claim(leased=None, progressed=True)

@@ -1,8 +1,8 @@
 """Write resolver mutations into facts, edges, events, and rejected claims.
 
 Functions take a connection and never commit; callers own the transaction.
-``reject`` records the claim and marks the fact. ``correct()`` then calls
-``restore_displaced`` so a value that was only pushed aside can return to ACTIVE.
+``reject`` records the claim, marks the fact, and restores a value that was
+only pushed aside — the same restore ``correct()`` uses (ADR 0008).
 """
 
 from __future__ import annotations
@@ -423,6 +423,8 @@ def _reject(
             now,
         ),
     )
+    if result.fact_id is not None:
+        restore_displaced(conn, result.fact_id, episode_id=ctx.episode_id, now=now)
     return result
 
 
