@@ -46,21 +46,14 @@ jobs:
             exit 0
           fi
 
-          cross=$(gh pr view "$ISSUE" --json isCrossRepository --jq .isCrossRepository)
-          if [ "$cross" = "true" ]; then
-            gh pr comment "$ISSUE" --body "Skipped live extract: \`/test\` only runs on same-repository pull requests."
-            echo "run=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-
-          sha=$(gh pr view "$ISSUE" --json headRefOid --jq .headRefOid)
           echo "run=true" >> "$GITHUB_OUTPUT"
-          echo "sha=$sha" >> "$GITHUB_OUTPUT"
 
+      # issue_comment is privileged and has secrets. Checkout the triggering
+      # default-branch commit only — never the pull request — then run pytest.
       - if: steps.gate.outputs.run == 'true'
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          ref: ${{ steps.gate.outputs.sha }}
+          persist-credentials: false
 
       - name: Require API key
         if: steps.gate.outputs.run == 'true'
@@ -99,7 +92,7 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           set -euo pipefail
-          gh pr comment "$ISSUE" --body "Live extract passed on the canonical chat (Delhi then Bangalore / Rust). Log: ${RUN_URL}"
+          gh pr comment "$ISSUE" --body "Live extract passed on the canonical chat (Delhi then Bangalore / Rust) against the default branch. Log: ${RUN_URL}"
 
       - name: Comment failure
         if: failure() && steps.gate.outputs.run == 'true'

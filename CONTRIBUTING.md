@@ -36,7 +36,7 @@ Every PR also gets free automated review gates:
 | **CI** | Ruff (with inline annotations), format, pyright, pytest, package build |
 | **PR quality** | Requires `## What` / `## Why` / `## Docs` in the body; fails oversized diffs (>1000 lines unless labeled `large-pr`); actionlint posts workflow findings as review comments; gitleaks scans for secrets |
 | **CodeQL** | Security analysis for Python and GitHub Actions (free on public repos) |
-| **Live extract** | Not on every PR. A repository admin comments `/test` on a same-repository PR to run `pytest -m live` against a real model on one canonical chat (Delhi, then a move to Bangalore / Rust). Needs the `OPENAI_API_KEY` Actions secret. Fork PRs are refused so untrusted code cannot use the key. |
+| **Live extract** | Not on every PR. A repository admin comments `/test` on a PR to run `pytest -m live` against a real model on one canonical chat (Delhi, then a move to Bangalore / Rust). It checks out the default branch only, so unmerged PR code never sees `OPENAI_API_KEY`. Test a branch locally with `TENSEMEM_LIVE=1`. |
 
 We do **not** depend on third-party AI review apps (many look free then push a paid trial). Quality comes from the gates above plus human review.
 
