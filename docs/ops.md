@@ -36,4 +36,4 @@ Numbered files live in the package (`0001_init.sql`, …) and run automatically 
 
 ## Concurrency
 
-One writer thread per `Memory` process. Two processes (or two `Memory` handles) on the same file serialize on `BEGIN IMMEDIATE` plus the busy timeout. `tensemem mcp` is one such process; inspect with the CLI while it runs is safe. For heavy multi-process ingest, run one writer.
+One writer thread per `Memory` process. Two processes (or two `Memory` handles) on the same file serialize on `BEGIN IMMEDIATE` plus the busy timeout. `tensemem mcp` and `tensemem serve` are each one such process; inspect with the CLI while they run is safe. For heavy multi-process ingest, run one `tensemem serve` writer and talk to it over HTTP.

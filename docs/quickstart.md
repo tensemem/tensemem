@@ -39,3 +39,12 @@ tensemem --db /absolute/path/tensemem.db mcp --user u1
 ```
 
 See [MCP](mcp.md) for the tool list and host config.
+
+HTTP on the same file:
+
+```bash
+pip install "tensemem[server]"
+tensemem --db /absolute/path/tensemem.db serve --port 8080
+```
+
+See [REST](server.md) for the routes.

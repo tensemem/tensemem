@@ -10,6 +10,7 @@ nav:
   - API: api.md
   - CLI: cli.md
   - MCP: mcp.md
+  - REST: server.md
   - TenseBench: tensebench.md
   - Golden extract: golden.md
   - Context latency: latency.md

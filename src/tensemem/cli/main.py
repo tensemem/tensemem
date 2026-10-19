@@ -120,6 +120,11 @@ def _parser() -> argparse.ArgumentParser:
     mcp_p.add_argument("--user", default="", help="default user_id when a tool omits it")
     mcp_p.set_defaults(handler=_cmd_mcp)
 
+    serve_p = sub.add_parser("serve", help="REST server (needs tensemem[server])")
+    serve_p.add_argument("--host", default="127.0.0.1")
+    serve_p.add_argument("--port", type=int, default=8080)
+    serve_p.set_defaults(handler=_cmd_serve)
+
     latency = sub.add_parser("latency", help="time empty-query context() (no database required)")
     latency.add_argument(
         "--facts",
@@ -292,6 +297,23 @@ def _cmd_bench(args: argparse.Namespace) -> int:
         print(json.dumps(report.model_dump(mode="json"), indent=2))
         return 0
     print(format_report(report))
+    return 0
+
+
+def _cmd_serve(args: argparse.Namespace) -> int:
+    from tensemem.server import serve
+
+    try:
+        serve(
+            args.db,
+            host=args.host,
+            port=args.port,
+            agent_id=args.agent_id,
+            namespace=args.namespace,
+        )
+    except RuntimeError as extra:
+        print(extra, file=sys.stderr)
+        return 1
     return 0
 
 

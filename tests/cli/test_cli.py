@@ -120,6 +120,41 @@ def test_mcp_cli_creates_db_and_reports_missing_extra(
     }
 
 
+def test_serve_cli_reports_missing_extra_and_flag_order(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    db = tmp_path / "rest.db"
+
+    def missing(*args: object, **kwargs: object) -> None:
+        raise RuntimeError("tensemem serve needs tensemem[server]")
+
+    monkeypatch.setattr("tensemem.server.serve", missing)
+    assert main(["--db", str(db), "serve"]) == 1
+    assert "tensemem[server]" in capsys.readouterr().err
+
+    seen: dict[str, object] = {}
+
+    def fake_serve(path: str, *, host: str, port: int, agent_id: str, namespace: str) -> None:
+        seen["path"] = path
+        seen["host"] = host
+        seen["port"] = port
+        seen["agent"] = agent_id
+        seen["namespace"] = namespace
+
+    monkeypatch.setattr("tensemem.server.serve", fake_serve)
+    with pytest.raises(SystemExit) as raised:
+        main(["serve", "--db", str(db)])
+    assert raised.value.code == 2
+    assert main(["--db", str(db), "serve", "--host", "127.0.0.1", "--port", "8091"]) == 0
+    assert seen == {
+        "path": str(db),
+        "host": "127.0.0.1",
+        "port": 8091,
+        "agent": "",
+        "namespace": "default",
+    }
+
+
 def test_latency_prints_percentiles(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["latency", "--facts", "8", "--rounds", "5"]) == 0
     out = capsys.readouterr().out

@@ -36,4 +36,4 @@ A fresh file is seeded with the FakeExtractor predicates (`lives_in`, `uses_lang
 
 Reads include freshness (`as_of_seq`, `pending`, `is_current`). Recalled text is fenced so a later `remember` of the same conversation does not learn from the model's own echo.
 
-This process does not start REST or HTTP MCP. For a second process on the same file, see [Operations](ops.md).
+This process does not start REST. For HTTP, see [REST](server.md). For a second process on the same file, see [Operations](ops.md).

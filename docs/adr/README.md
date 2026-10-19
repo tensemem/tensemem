@@ -14,6 +14,7 @@ Each record captures one significant design decision: the context, what we chose
 | [0008](0008-corrections-are-first-class.md) | Corrections are first-class and survive rebuilds | Accepted |
 | [0009](0009-tensebench-safe-to-act.md) | TenseBench scores safe-to-act-on properties | Accepted |
 | [0010](0010-mcp-stdio.md) | MCP is a stdio adapter over the same engine | Accepted |
+| [0011](0011-rest-serve.md) | REST is an HTTP adapter over the same engine | Accepted |
 
 ## Template
 

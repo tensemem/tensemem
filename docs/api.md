@@ -58,3 +58,4 @@ mem.forget(user_id="u1")
 - `Memory(..., hooks=[fn])` or `mem.on(fn)` receives `(event, payload)`. Hook errors are logged and ignored.
 - Structured logs go to the `tensemem` logger (`event=extraction scope_id=1 jobs=2`).
 - `tensemem mcp` maps `remember` / `recall_context` / `get_state` / `get_history` / `forget` onto this API. See [MCP](mcp.md).
+- `tensemem serve` maps the same five operations to HTTP. See [REST](server.md).
