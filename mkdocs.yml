@@ -11,5 +11,6 @@ nav:
   - CLI: cli.md
   - TenseBench: tensebench.md
   - Golden extract: golden.md
+  - Context latency: latency.md
   - Operations: ops.md
   - Architecture decisions: adr/README.md

@@ -1,4 +1,4 @@
-"""Print golden-set precision and recall, or TenseBench scores."""
+"""Print golden-set scores, TenseBench, or context() latency."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ import sys
 from pathlib import Path
 
 from tensemem.eval.golden import default_cases_path, evaluate, load_cases
+from tensemem.eval.latency import format_report as format_latency
+from tensemem.eval.latency import run_latency
 from tensemem.eval.tensebench import format_report, run_suite
 from tensemem.providers.llm.fake import FakeExtractor
 
@@ -15,6 +17,9 @@ def main(argv: list[str] | None = None) -> None:
     raw = list(sys.argv[1:] if argv is None else argv)
     if raw[:1] == ["bench"]:
         _bench(raw[1:])
+        return
+    if raw[:1] == ["latency"]:
+        _latency(raw[1:])
         return
     parser = argparse.ArgumentParser(description="Score extract against labeled utterances.")
     parser.add_argument(
@@ -42,6 +47,19 @@ def _bench(argv: list[str]) -> None:
     parser.add_argument("--path", type=Path, default=None)
     args = parser.parse_args(argv)
     print(format_report(run_suite(args.path)))
+
+
+def _latency(argv: list[str]) -> None:
+    parser = argparse.ArgumentParser(description="Time empty-query context() reads.")
+    parser.add_argument("--facts", type=int, default=None)
+    parser.add_argument("--rounds", type=int, default=None)
+    args = parser.parse_args(argv)
+    kwargs: dict[str, int] = {}
+    if args.facts is not None:
+        kwargs["facts"] = args.facts
+    if args.rounds is not None:
+        kwargs["rounds"] = args.rounds
+    print(format_latency(run_latency(**kwargs)))
 
 
 if __name__ == "__main__":

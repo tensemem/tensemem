@@ -85,3 +85,14 @@ def test_bench_prints_pilot_metrics(capsys: pytest.CaptureFixture[str]) -> None:
     payload = capsys.readouterr().out
     assert '"cases"' in payload
     assert "tensemem" in payload
+
+
+def test_latency_prints_percentiles(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["latency", "--facts", "8", "--rounds", "5"]) == 0
+    out = capsys.readouterr().out
+    assert "p50_ms:" in out
+    assert "p99_ms:" in out
+    assert main(["--json", "latency", "--facts", "8", "--rounds", "5"]) == 0
+    payload = capsys.readouterr().out
+    assert '"p50_ms"' in payload
+    assert '"facts"' in payload

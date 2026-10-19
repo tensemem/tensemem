@@ -19,10 +19,13 @@ tensemem rebuild --user u1
 tensemem backup copy.db
 tensemem stats --user u1
 tensemem bench
+tensemem latency
 ```
 
 Global flags: `--db path.db`, `--json`, `--agent`, `--namespace`.
 
 `tensemem bench` does not open a database. It scores the packaged TenseBench pilot (override with `--path`) against TenseMem, concatenated history, and token-overlap retrieval. See [TenseBench](tensebench.md).
+
+`tensemem latency` also skips the database file. It seeds ACTIVE facts in memory and times empty-query `context()`. See [Context latency](latency.md).
 
 `rebuild` from the CLI replays explicit ops and re-queues messages. Re-extract those messages from Python with `Memory(..., llm=...).rebuild(user_id, wait=True)`.

@@ -115,6 +115,16 @@ def _parser() -> argparse.ArgumentParser:
         help="repeat to choose systems (default: all)",
     )
     bench.set_defaults(handler=_cmd_bench)
+
+    latency = sub.add_parser("latency", help="time empty-query context() (no database required)")
+    latency.add_argument(
+        "--facts",
+        type=int,
+        default=None,
+        help="ACTIVE facts to seed (default 5000)",
+    )
+    latency.add_argument("--rounds", type=int, default=None, help="timed reads (default 80)")
+    latency.set_defaults(handler=_cmd_latency)
     return parser
 
 
@@ -274,6 +284,22 @@ def _cmd_bench(args: argparse.Namespace) -> int:
     from tensemem.eval.tensebench import format_report, run_suite
 
     report = run_suite(args.path, systems=args.systems)
+    if args.json:
+        print(json.dumps(report.model_dump(mode="json"), indent=2))
+        return 0
+    print(format_report(report))
+    return 0
+
+
+def _cmd_latency(args: argparse.Namespace) -> int:
+    from tensemem.eval.latency import format_report, run_latency
+
+    kwargs: dict[str, int] = {}
+    if args.facts is not None:
+        kwargs["facts"] = args.facts
+    if args.rounds is not None:
+        kwargs["rounds"] = args.rounds
+    report = run_latency(**kwargs)
     if args.json:
         print(json.dumps(report.model_dump(mode="json"), indent=2))
         return 0
