@@ -43,7 +43,7 @@ print(ctx.text)  # fenced Markdown; ctx.freshness.is_current
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and workflow, and [docs/adr](docs/adr) for the design decisions behind the engine.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and workflow, and [docs/adr](docs/adr) for the design decisions behind the engine. Labeled extract cases live in `tests/golden/`; `pytest tests/golden` scores `FakeExtractor`, and `python -m tensemem.eval` prints precision and recall.
 
 ## License
 

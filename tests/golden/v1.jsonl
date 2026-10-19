@@ -1,0 +1,18 @@
+{"id": "live-delhi", "category": "move", "text": "I live in Delhi", "expected": [{"predicate": "lives_in", "object": "Delhi", "op": "SET"}]}
+{"id": "moved-bangalore", "category": "move", "text": "I moved to Bangalore", "expected": [{"predicate": "lives_in", "object": "Bangalore", "op": "SET"}]}
+{"id": "live-pune", "category": "move", "text": "I live in Pune", "expected": [{"predicate": "lives_in", "object": "Pune", "op": "SET"}]}
+{"id": "live-new-york", "category": "move", "text": "I live in New York", "expected": [{"predicate": "lives_in", "object": "New York", "op": "SET"}]}
+{"id": "only-rust", "category": "language", "text": "I now only write Rust", "expected": [{"predicate": "uses_language", "object": "Rust", "op": "REPLACE_SET"}]}
+{"id": "write-python", "category": "language", "text": "I write Python", "expected": [{"predicate": "uses_language", "object": "Python", "op": "ADD"}]}
+{"id": "write-go", "category": "language", "text": "I write Go", "expected": [{"predicate": "uses_language", "object": "Go", "op": "ADD"}]}
+{"id": "write-cpp", "category": "language", "text": "I write C++", "expected": [{"predicate": "uses_language", "object": "C++", "op": "ADD"}]}
+{"id": "move-and-rust", "category": "move", "text": "I moved to Bangalore last week and now only write Rust.", "expected": [{"predicate": "lives_in", "object": "Bangalore", "op": "SET"}, {"predicate": "uses_language", "object": "Rust", "op": "REPLACE_SET"}]}
+{"id": "chitchat-thanks", "category": "chitchat", "text": "thanks", "expected": []}
+{"id": "chitchat-lol", "category": "chitchat", "text": "lol", "expected": []}
+{"id": "chitchat-hello", "category": "chitchat", "text": "hello there", "expected": []}
+{"id": "deny-pune", "category": "deny", "text": "I never lived in Pune", "expected": [{"predicate": "lives_in", "object": "Pune", "op": "DENY"}], "skip_fake": true}
+{"id": "retract-delhi", "category": "retract", "text": "I don't live in Delhi anymore", "expected": [{"predicate": "lives_in", "object": "Delhi", "op": "RETRACT"}], "skip_fake": true}
+{"id": "hypothetical-goa", "category": "hypothetical", "text": "If I moved to Goa next year that would be nice", "expected": [], "skip_fake": true}
+{"id": "confirm-yes", "category": "confirmation", "text": "yes", "facts": [{"subject": "user", "predicate": "lives_in", "object": "Delhi"}], "expected": [{"predicate": "lives_in", "object": "Delhi", "op": "SET"}], "skip_fake": true}
+{"id": "third-party-wife", "category": "third_party", "text": "My wife lives in Mumbai", "expected": [{"subject": "user.wife", "predicate": "lives_in", "object": "Mumbai", "op": "SET"}], "skip_fake": true}
+{"id": "diet-vegetarian", "category": "diet", "text": "I'm vegetarian", "expected": [{"predicate": "diet", "object": "vegetarian", "op": "SET"}], "skip_fake": true}
