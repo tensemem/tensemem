@@ -6,6 +6,7 @@ import sqlite3
 from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
+from urllib.parse import parse_qsl, urlencode
 
 MIN_SQLITE_VERSION = (3, 35, 0)
 
@@ -120,7 +121,7 @@ def resolve_uri(
         name = shared_memory_name or "tensemem"
         return f"file:{name}?mode=memory&cache=shared"
     if text.startswith("file:"):
-        return text
+        return _file_uri(text, read_only=read_only)
 
     resolved = Path(text).expanduser().resolve()
     if read_only:
@@ -130,3 +131,20 @@ def resolve_uri(
         return f"file:{resolved.as_posix()}?mode=ro"
     resolved.parent.mkdir(parents=True, exist_ok=True)
     return f"file:{resolved.as_posix()}"
+
+
+def _file_uri(text: str, *, read_only: bool) -> str:
+    """Keep shared-memory URIs; force ``mode=ro`` on filesystem URIs when asked."""
+    base, _, query = text.partition("?")
+    params = parse_qsl(query, keep_blank_values=True)
+    modes = {value for key, value in params if key == "mode"}
+    if "memory" in modes:
+        return text
+    if not read_only:
+        return text
+    if modes & {"rw", "rwc"}:
+        msg = "read-only connections cannot open a writable SQLite URI"
+        raise ValueError(msg)
+    kept = [(key, value) for key, value in params if key != "mode"]
+    kept.append(("mode", "ro"))
+    return f"{base}?{urlencode(kept)}"

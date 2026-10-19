@@ -6,14 +6,14 @@ import sqlite3
 from collections.abc import Sequence
 
 from tensemem.core.models import ExtractedOp, Scope
-from tensemem.core.normalize import normalize_value, strip_articles
+from tensemem.core.normalize import normalize_key, normalize_value, strip_articles
 from tensemem.core.resolver import IncomingOp
 from tensemem.storage.sqlite.entities import (
     ensure_subject_entity,
     resolve_entity,
     subject_label,
 )
-from tensemem.storage.sqlite.registry import add_predicate_alias, get_predicate, register_predicate
+from tensemem.storage.sqlite.registry import get_predicate, register_predicate
 
 
 def normalize_ops(
@@ -41,10 +41,10 @@ def _normalize_one(
 ) -> IncomingOp | None:
     predicate = get_predicate(conn, op.predicate)
     if predicate is None and op.new_predicate is not None:
-        predicate = register_predicate(conn, op.new_predicate, now=now)
-        if get_predicate(conn, op.predicate) is None:
-            add_predicate_alias(conn, op.predicate, predicate)
-        predicate = get_predicate(conn, op.predicate) or predicate
+        spec = op.new_predicate
+        if normalize_key(spec.name) != normalize_key(op.predicate):
+            return None
+        predicate = register_predicate(conn, spec.model_copy(update={"aliases": ()}), now=now)
     if predicate is None:
         return None
 

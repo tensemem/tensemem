@@ -21,6 +21,12 @@ def test_keep_ops_requires_verbatim_evidence() -> None:
     assert empty == ()
 
 
+def test_keep_ops_caps_and_reuses_evidence_lookups() -> None:
+    ops = tuple(_op(f"c{index}", evidence="I live") for index in range(140))
+    kept = keep_ops(ops, "I live")
+    assert len(kept) == 128
+
+
 def test_keep_ops_leaves_confirmation_to_the_extractor() -> None:
     flagged = keep_ops((_op("Delhi", evidence="yes", is_confirmation=True),), "yes")
     plain = keep_ops((_op("Delhi", evidence="I live in Delhi"),), "I live in Delhi")

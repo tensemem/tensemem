@@ -54,7 +54,7 @@ tensemem bench
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and workflow, [docs/](docs/) for the docs site (quickstart, concepts, API, CLI, TenseBench, ops), and [docs/adr](docs/adr) for the design decisions behind the engine. Labeled extract cases live in `tests/golden/`; `pytest tests/golden` scores `FakeExtractor`, and `python -m tensemem.eval` prints precision and recall. `tensemem bench` (or `python -m tensemem.eval bench`) scores the TenseBench pilot. Preview docs with `uvx mkdocs serve`.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and workflow, [docs/](docs/) for the docs site (quickstart, concepts, API, CLI, TenseBench, ops), and [docs/adr](docs/adr) for the design decisions behind the engine. Labeled extract cases (150+) live in `tests/golden/`; `pytest tests/golden` scores `FakeExtractor`, and `python -m tensemem.eval` prints precision and recall. `tensemem bench` (or `python -m tensemem.eval bench`) scores the TenseBench pilot. Preview docs with `uvx mkdocs serve`.
 
 ## License
 

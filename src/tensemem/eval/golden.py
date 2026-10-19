@@ -23,6 +23,14 @@ _DEFAULT_REGISTRY = (
         description="programming languages",
     ),
     RegistryEntry(name="diet", cardinality=Cardinality.ONE, description="dietary constraint"),
+    RegistryEntry(name="works_at", cardinality=Cardinality.ONE, description="employer"),
+    RegistryEntry(name="job_title", cardinality=Cardinality.ONE, description="job title"),
+    RegistryEntry(name="uses_tool", cardinality=Cardinality.MANY, description="tools and products"),
+    RegistryEntry(name="allergic_to", cardinality=Cardinality.MANY, description="allergens"),
+    RegistryEntry(name="prefers", cardinality=Cardinality.MANY, description="preferences"),
+    RegistryEntry(name="name", cardinality=Cardinality.ONE, description="display name"),
+    RegistryEntry(name="timezone", cardinality=Cardinality.ONE, description="timezone"),
+    RegistryEntry(name="pet", cardinality=Cardinality.MANY, description="pets"),
 )
 
 

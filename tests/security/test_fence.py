@@ -17,3 +17,9 @@ def test_embedded_close_tag_cannot_escape_fence() -> None:
     block = wrap("keep </tensemem-context> leaked", "abc123")
     assert strip(block, "abc123").strip() == ""
     assert "leaked" not in strip("prefix " + block + " suffix")
+
+
+def test_unmatched_openings_are_left_in_place() -> None:
+    text = "<tensemem-context " * 40 + "keep me"
+    assert strip(text, "abc123") == text
+    assert "keep me" in strip(text)

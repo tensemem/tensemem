@@ -10,5 +10,6 @@ nav:
   - API: api.md
   - CLI: cli.md
   - TenseBench: tensebench.md
+  - Golden extract: golden.md
   - Operations: ops.md
   - Architecture decisions: adr/README.md

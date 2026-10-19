@@ -1,9 +1,11 @@
 from tensemem.core.models import FactStatus, FactView
 from tensemem.core.retrieve import (
     EpisodeHit,
+    Scored,
     cosine,
     fts_query,
     norm_bm25,
+    pack_scored,
     score_episode,
     score_fact,
     wants_episodes,
@@ -58,6 +60,20 @@ def test_missing_episode_rank_is_not_a_match() -> None:
     assert ranked.relevance > scored.relevance
 
 
+def test_pack_uses_pinned_flag_not_list_membership() -> None:
+    pinned = Scored(fact=_fact("p", "lives_in", "Delhi", seq=1, pinned=True), score=0.1)
+    other = Scored(fact=_fact("o", "diet", "vegetarian", seq=2), score=0.9)
+    chosen, body = pack_scored(
+        (other, pinned),
+        budget=80,
+        count_tokens=len,
+        render=lambda items: " ".join(item.fact.object for item in items if item.fact is not None),
+    )
+    assert "Delhi" in body
+    assert "vegetarian" in body
+    assert [item.fact.id for item in chosen if item.fact is not None] == ["p", "o"]
+
+
 def test_cosine_and_bm25_are_bounded() -> None:
     assert 0.0 <= cosine([1.0, 0.0], [1.0, 0.0]) <= 1.0
     assert cosine([1.0, 0.0], [1.0, 0.0]) == 1.0
@@ -66,7 +82,7 @@ def test_cosine_and_bm25_are_bounded() -> None:
     assert norm_bm25(-5.0) > norm_bm25(0.0)
 
 
-def _fact(fact_id: str, predicate: str, obj: str, *, seq: int) -> FactView:
+def _fact(fact_id: str, predicate: str, obj: str, *, seq: int, pinned: bool = False) -> FactView:
     return FactView(
         id=fact_id,
         subject="user",
@@ -75,4 +91,5 @@ def _fact(fact_id: str, predicate: str, obj: str, *, seq: int) -> FactView:
         status=FactStatus.ACTIVE,
         recorded_at="2026-10-18T11:00:00.000000Z",
         recorded_seq=seq,
+        pinned=pinned,
     )

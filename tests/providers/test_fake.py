@@ -26,6 +26,31 @@ def test_only_elsewhere_does_not_replace_language() -> None:
     assert lang.op is OpKind.ADD
 
 
+def test_hedge_and_third_party_and_retract() -> None:
+    fake = FakeExtractor()
+    silent = fake.structured(
+        [{"role": "user", "content": "If I moved to Goa next year that would be nice"}],
+        ExtractionResult,
+    )
+    assert silent.ops == ()
+    wife = fake.structured(
+        [{"role": "user", "content": "My wife lives in Mumbai"}],
+        ExtractionResult,
+    )
+    assert wife.ops[0].subject == "user.wife"
+    assert wife.ops[0].object == "Mumbai"
+    retract = fake.structured(
+        [{"role": "user", "content": "I don't live in Delhi anymore"}],
+        ExtractionResult,
+    )
+    assert retract.ops[0].op is OpKind.RETRACT
+    deny = fake.structured(
+        [{"role": "user", "content": "I never lived in Pune"}],
+        ExtractionResult,
+    )
+    assert deny.ops[0].op is OpKind.DENY
+
+
 def test_scripted_queue_and_mapping() -> None:
     queued = ExtractionResult(
         ops=(

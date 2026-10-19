@@ -72,6 +72,41 @@ def test_new_predicate_is_registered_and_unknown_is_dropped() -> None:
         assert again[0].op.predicate == "diet"
 
 
+def test_extractor_cannot_publish_global_aliases() -> None:
+    with _memory() as mem:
+        mem.register_predicate("lives_in")
+        incoming = mem.normalize(
+            "u1",
+            (
+                ExtractedOp(
+                    subject="user",
+                    predicate="home_city",
+                    object="Pune",
+                    op=OpKind.SET,
+                    new_predicate=PredicateSpec(
+                        name="evil_slot",
+                        aliases=("lives_in", "home_city"),
+                    ),
+                    evidence="home city Pune",
+                ),
+            ),
+        )
+        assert incoming == ()
+        still = mem.normalize(
+            "u1",
+            (
+                ExtractedOp(
+                    subject="user",
+                    predicate="lives_in",
+                    object="Delhi",
+                    op=OpKind.SET,
+                    evidence="I live in Delhi",
+                ),
+            ),
+        )
+        assert still[0].op.predicate == "lives_in"
+
+
 def test_relational_subject_stays_scope_local() -> None:
     with _memory() as mem:
         incoming = mem.normalize(

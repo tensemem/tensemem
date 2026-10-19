@@ -163,7 +163,8 @@ def _replace_set(
                     target_fact_id=fact.id,
                 )
             )
-    remaining = [f for f in active if f.id not in {m.target_fact_id for m in mutations}]
+    retracted = {mutation.target_fact_id for mutation in mutations}
+    remaining = [fact for fact in active if fact.id not in retracted]
     mutations.extend(_set_or_add(incoming, remaining, snapshot))
     return mutations
 

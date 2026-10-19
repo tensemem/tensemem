@@ -11,6 +11,7 @@ TenseMem stores raw messages as an append-only log and projects them into facts 
 - [Python API](api.md) — `Memory` and `AsyncMemory`
 - [CLI](cli.md) — inspect, history, explain, search, jobs, bench
 - [TenseBench](tensebench.md) — safe-to-act-on metrics
+- [Golden extract](golden.md) — labeled utterances for precision and recall
 - [Operations](ops.md) — backup, JSONL export, Litestream, migrations
 
 Local preview (optional): `uvx mkdocs serve`.

@@ -5,31 +5,34 @@ from tensemem.core.models import ExtractedOp, OpKind
 from tensemem.eval.golden import GoldOp, evaluate, load_cases, score_ops
 
 _V1 = Path(__file__).with_name("v1.jsonl")
+_LIVE_SKIP = {"confirmation", "sarcasm"}
 
 
 def test_fake_extractor_hits_every_scored_case() -> None:
     cases = load_cases(_V1)
     report = evaluate(FakeExtractor(), cases, skip_fake=True)
-    assert report.cases >= 10
+    assert len(cases) >= 150
+    assert report.cases >= 140
     assert report.skipped >= 1
     assert report.precision == 1.0
     assert report.recall == 1.0
-    assert "move" in report.by_category
-    assert "language" in report.by_category
-    assert "chitchat" in report.by_category
-
-
-def test_skip_fake_cases_are_labeled() -> None:
-    cases = load_cases(_V1)
-    skipped = [case for case in cases if case.skip_fake]
-    assert {case.category for case in skipped} >= {
-        "deny",
+    assert report.by_category.keys() >= {
+        "move",
+        "language",
+        "chitchat",
         "retract",
+        "deny",
         "hypothetical",
-        "confirmation",
-        "third_party",
+        "job",
         "diet",
+        "third_party",
     }
+
+
+def test_skip_fake_cases_are_llm_only() -> None:
+    cases = load_cases(_V1)
+    skipped = {case.category for case in cases if case.skip_fake}
+    assert skipped == _LIVE_SKIP
 
 
 def test_score_ops_is_a_set_match() -> None:

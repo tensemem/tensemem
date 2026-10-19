@@ -234,7 +234,7 @@ def pack_scored(
     facts = [item for item in items if item.fact is not None]
     episodes = [item for item in items if item.episode is not None]
     pinned = [item for item in facts if item.fact is not None and item.fact.pinned]
-    other = [item for item in facts if item not in pinned]
+    other = [item for item in facts if item.fact is not None and not item.fact.pinned]
     reserved = int(budget * CORE_SHARE) if pinned else 0
     chosen: list[Scored] = []
     body = ""
@@ -242,7 +242,8 @@ def pack_scored(
         chosen, body = _fill(
             pinned, chosen, budget=reserved, count_tokens=count_tokens, render=render
         )
-    leftover = [item for item in pinned if item not in chosen]
+    packed = {id(item) for item in chosen}
+    leftover = [item for item in pinned if id(item) not in packed]
     rest = sorted(other + leftover + episodes, key=lambda item: item.score, reverse=True)
     chosen, body = _fill(rest, chosen, budget=budget, count_tokens=count_tokens, render=render)
     return tuple(chosen), body

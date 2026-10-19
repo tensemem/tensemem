@@ -1,6 +1,6 @@
 # TenseBench
 
-TenseBench scores whether recalled memory is **safe to act on**. Extraction precision lives in the golden set (`python -m tensemem.eval`). This harness asks a different question: after state changes, does the system still present an outdated fact as if it were current?
+TenseBench scores whether recalled memory is **safe to act on**. Extraction precision lives in the [golden set](golden.md) (`python -m tensemem.eval`). This harness asks a different question: after state changes, does the system still present an outdated fact as if it were current?
 
 The pilot (`src/tensemem/eval/tensebench_v1.jsonl`, shipped in the package) is 30 hand-written conversations. CI runs it with `FakeExtractor` so the numbers are deterministic. A later slice grows the set and adds hosted-model runs.
 

@@ -2,17 +2,157 @@
 {"id": "moved-bangalore", "category": "move", "text": "I moved to Bangalore", "expected": [{"predicate": "lives_in", "object": "Bangalore", "op": "SET"}]}
 {"id": "live-pune", "category": "move", "text": "I live in Pune", "expected": [{"predicate": "lives_in", "object": "Pune", "op": "SET"}]}
 {"id": "live-new-york", "category": "move", "text": "I live in New York", "expected": [{"predicate": "lives_in", "object": "New York", "op": "SET"}]}
+{"id": "live-mumbai", "category": "move", "text": "I live in Mumbai", "expected": [{"predicate": "lives_in", "object": "Mumbai", "op": "SET"}]}
+{"id": "live-london", "category": "move", "text": "I live in London", "expected": [{"predicate": "lives_in", "object": "London", "op": "SET"}]}
+{"id": "live-paris", "category": "move", "text": "I live in Paris", "expected": [{"predicate": "lives_in", "object": "Paris", "op": "SET"}]}
+{"id": "live-berlin", "category": "move", "text": "I live in Berlin", "expected": [{"predicate": "lives_in", "object": "Berlin", "op": "SET"}]}
+{"id": "live-tokyo", "category": "move", "text": "I live in Tokyo", "expected": [{"predicate": "lives_in", "object": "Tokyo", "op": "SET"}]}
+{"id": "live-seattle", "category": "move", "text": "I live in Seattle", "expected": [{"predicate": "lives_in", "object": "Seattle", "op": "SET"}]}
+{"id": "live-austin", "category": "move", "text": "I live in Austin", "expected": [{"predicate": "lives_in", "object": "Austin", "op": "SET"}]}
+{"id": "live-chicago", "category": "move", "text": "I live in Chicago", "expected": [{"predicate": "lives_in", "object": "Chicago", "op": "SET"}]}
+{"id": "moved-goa", "category": "move", "text": "I moved to Goa", "expected": [{"predicate": "lives_in", "object": "Goa", "op": "SET"}]}
+{"id": "moved-lisbon", "category": "move", "text": "I moved to Lisbon", "expected": [{"predicate": "lives_in", "object": "Lisbon", "op": "SET"}]}
+{"id": "moved-dublin", "category": "move", "text": "I moved to Dublin", "expected": [{"predicate": "lives_in", "object": "Dublin", "op": "SET"}]}
+{"id": "moved-nairobi", "category": "move", "text": "I moved to Nairobi", "expected": [{"predicate": "lives_in", "object": "Nairobi", "op": "SET"}]}
+{"id": "live-san-francisco", "category": "move", "text": "I live in San Francisco", "expected": [{"predicate": "lives_in", "object": "San Francisco", "op": "SET"}]}
+{"id": "live-los-angeles", "category": "move", "text": "I live in Los Angeles", "expected": [{"predicate": "lives_in", "object": "Los Angeles", "op": "SET"}]}
 {"id": "only-rust", "category": "language", "text": "I now only write Rust", "expected": [{"predicate": "uses_language", "object": "Rust", "op": "REPLACE_SET"}]}
 {"id": "write-python", "category": "language", "text": "I write Python", "expected": [{"predicate": "uses_language", "object": "Python", "op": "ADD"}]}
 {"id": "write-go", "category": "language", "text": "I write Go", "expected": [{"predicate": "uses_language", "object": "Go", "op": "ADD"}]}
 {"id": "write-cpp", "category": "language", "text": "I write C++", "expected": [{"predicate": "uses_language", "object": "C++", "op": "ADD"}]}
-{"id": "move-and-rust", "category": "move", "text": "I moved to Bangalore last week and now only write Rust.", "expected": [{"predicate": "lives_in", "object": "Bangalore", "op": "SET"}, {"predicate": "uses_language", "object": "Rust", "op": "REPLACE_SET"}]}
+{"id": "write-java", "category": "language", "text": "I write Java", "expected": [{"predicate": "uses_language", "object": "Java", "op": "ADD"}]}
+{"id": "write-typescript", "category": "language", "text": "I write TypeScript", "expected": [{"predicate": "uses_language", "object": "TypeScript", "op": "ADD"}]}
+{"id": "write-ruby", "category": "language", "text": "I write Ruby", "expected": [{"predicate": "uses_language", "object": "Ruby", "op": "ADD"}]}
+{"id": "write-swift", "category": "language", "text": "I write Swift", "expected": [{"predicate": "uses_language", "object": "Swift", "op": "ADD"}]}
+{"id": "write-kotlin", "category": "language", "text": "I write Kotlin", "expected": [{"predicate": "uses_language", "object": "Kotlin", "op": "ADD"}]}
+{"id": "write-php", "category": "language", "text": "I write PHP", "expected": [{"predicate": "uses_language", "object": "PHP", "op": "ADD"}]}
+{"id": "write-scala", "category": "language", "text": "I write Scala", "expected": [{"predicate": "uses_language", "object": "Scala", "op": "ADD"}]}
+{"id": "write-haskell", "category": "language", "text": "I write Haskell", "expected": [{"predicate": "uses_language", "object": "Haskell", "op": "ADD"}]}
+{"id": "write-rust", "category": "language", "text": "I write Rust", "expected": [{"predicate": "uses_language", "object": "Rust", "op": "ADD"}]}
+{"id": "also-go", "category": "language", "text": "I also write Go", "expected": [{"predicate": "uses_language", "object": "Go", "op": "ADD"}]}
+{"id": "also-rust", "category": "language", "text": "I also write Rust", "expected": [{"predicate": "uses_language", "object": "Rust", "op": "ADD"}]}
+{"id": "also-java", "category": "language", "text": "I also write Java", "expected": [{"predicate": "uses_language", "object": "Java", "op": "ADD"}]}
+{"id": "only-python", "category": "language", "text": "I now only write Python", "expected": [{"predicate": "uses_language", "object": "Python", "op": "REPLACE_SET"}]}
+{"id": "only-go", "category": "language", "text": "I now only write Go", "expected": [{"predicate": "uses_language", "object": "Go", "op": "REPLACE_SET"}]}
+{"id": "no-longer-python", "category": "language", "text": "I no longer write Python", "expected": [{"predicate": "uses_language", "object": "Python", "op": "REMOVE"}]}
+{"id": "no-longer-go", "category": "language", "text": "I no longer write Go", "expected": [{"predicate": "uses_language", "object": "Go", "op": "REMOVE"}]}
+{"id": "move-and-rust", "category": "mixed", "text": "I moved to Bangalore last week and now only write Rust.", "expected": [{"predicate": "lives_in", "object": "Bangalore", "op": "SET"}, {"predicate": "uses_language", "object": "Rust", "op": "REPLACE_SET"}]}
+{"id": "moved-london-write-go", "category": "mixed", "text": "I moved to London and write Go", "expected": [{"predicate": "lives_in", "object": "London", "op": "SET"}, {"predicate": "uses_language", "object": "Go", "op": "ADD"}]}
+{"id": "live-berlin-write-java", "category": "mixed", "text": "I live in Berlin and write Java", "expected": [{"predicate": "lives_in", "object": "Berlin", "op": "SET"}, {"predicate": "uses_language", "object": "Java", "op": "ADD"}]}
+{"id": "moved-tokyo-only-rust", "category": "mixed", "text": "I moved to Tokyo and now only write Rust", "expected": [{"predicate": "lives_in", "object": "Tokyo", "op": "SET"}, {"predicate": "uses_language", "object": "Rust", "op": "REPLACE_SET"}]}
+{"id": "live-delhi-write-python", "category": "mixed", "text": "I live in Delhi and write Python", "expected": [{"predicate": "lives_in", "object": "Delhi", "op": "SET"}, {"predicate": "uses_language", "object": "Python", "op": "ADD"}]}
+{"id": "moved-seattle-write-cpp", "category": "mixed", "text": "I moved to Seattle and write C++", "expected": [{"predicate": "lives_in", "object": "Seattle", "op": "SET"}, {"predicate": "uses_language", "object": "C++", "op": "ADD"}]}
 {"id": "chitchat-thanks", "category": "chitchat", "text": "thanks", "expected": []}
 {"id": "chitchat-lol", "category": "chitchat", "text": "lol", "expected": []}
 {"id": "chitchat-hello", "category": "chitchat", "text": "hello there", "expected": []}
-{"id": "deny-pune", "category": "deny", "text": "I never lived in Pune", "expected": [{"predicate": "lives_in", "object": "Pune", "op": "DENY"}], "skip_fake": true}
-{"id": "retract-delhi", "category": "retract", "text": "I don't live in Delhi anymore", "expected": [{"predicate": "lives_in", "object": "Delhi", "op": "RETRACT"}], "skip_fake": true}
-{"id": "hypothetical-goa", "category": "hypothetical", "text": "If I moved to Goa next year that would be nice", "expected": [], "skip_fake": true}
-{"id": "confirm-yes", "category": "confirmation", "text": "yes", "facts": [{"subject": "user", "predicate": "lives_in", "object": "Delhi"}], "expected": [{"predicate": "lives_in", "object": "Delhi", "op": "SET"}], "skip_fake": true}
-{"id": "third-party-wife", "category": "third_party", "text": "My wife lives in Mumbai", "expected": [{"subject": "user.wife", "predicate": "lives_in", "object": "Mumbai", "op": "SET"}], "skip_fake": true}
-{"id": "diet-vegetarian", "category": "diet", "text": "I'm vegetarian", "expected": [{"predicate": "diet", "object": "vegetarian", "op": "SET"}], "skip_fake": true}
+{"id": "chitchat-ok", "category": "chitchat", "text": "ok", "expected": []}
+{"id": "chitchat-hi", "category": "chitchat", "text": "hi", "expected": []}
+{"id": "chitchat-sure", "category": "chitchat", "text": "sure", "expected": []}
+{"id": "chitchat-cool", "category": "chitchat", "text": "cool", "expected": []}
+{"id": "chitchat-np", "category": "chitchat", "text": "np", "expected": []}
+{"id": "chitchat-good-morning", "category": "chitchat", "text": "good morning", "expected": []}
+{"id": "chitchat-good-night", "category": "chitchat", "text": "good night", "expected": []}
+{"id": "chitchat-hmm", "category": "chitchat", "text": "hmm", "expected": []}
+{"id": "chitchat-yo", "category": "chitchat", "text": "yo", "expected": []}
+{"id": "retract-delhi", "category": "retract", "text": "I don't live in Delhi anymore", "expected": [{"predicate": "lives_in", "object": "Delhi", "op": "RETRACT"}]}
+{"id": "retract-pune", "category": "retract", "text": "I don't live in Pune anymore", "expected": [{"predicate": "lives_in", "object": "Pune", "op": "RETRACT"}]}
+{"id": "retract-bangalore", "category": "retract", "text": "I don't live in Bangalore anymore", "expected": [{"predicate": "lives_in", "object": "Bangalore", "op": "RETRACT"}]}
+{"id": "retract-mumbai", "category": "retract", "text": "I don't live in Mumbai anymore", "expected": [{"predicate": "lives_in", "object": "Mumbai", "op": "RETRACT"}]}
+{"id": "retract-london", "category": "retract", "text": "I don't live in London anymore", "expected": [{"predicate": "lives_in", "object": "London", "op": "RETRACT"}]}
+{"id": "no-longer-live-delhi", "category": "retract", "text": "I no longer live in Delhi", "expected": [{"predicate": "lives_in", "object": "Delhi", "op": "RETRACT"}]}
+{"id": "no-longer-live-paris", "category": "retract", "text": "I no longer live in Paris", "expected": [{"predicate": "lives_in", "object": "Paris", "op": "RETRACT"}]}
+{"id": "dont-live-tokyo", "category": "retract", "text": "I don't live in Tokyo anymore", "expected": [{"predicate": "lives_in", "object": "Tokyo", "op": "RETRACT"}]}
+{"id": "deny-pune", "category": "deny", "text": "I never lived in Pune", "expected": [{"predicate": "lives_in", "object": "Pune", "op": "DENY"}]}
+{"id": "deny-delhi", "category": "deny", "text": "I never lived in Delhi", "expected": [{"predicate": "lives_in", "object": "Delhi", "op": "DENY"}]}
+{"id": "deny-bangalore", "category": "deny", "text": "I never lived in Bangalore", "expected": [{"predicate": "lives_in", "object": "Bangalore", "op": "DENY"}]}
+{"id": "deny-goa", "category": "deny", "text": "I never lived in Goa", "expected": [{"predicate": "lives_in", "object": "Goa", "op": "DENY"}]}
+{"id": "deny-london", "category": "deny", "text": "I never lived in London", "expected": [{"predicate": "lives_in", "object": "London", "op": "DENY"}]}
+{"id": "deny-mumbai", "category": "deny", "text": "I never lived in Mumbai", "expected": [{"predicate": "lives_in", "object": "Mumbai", "op": "DENY"}]}
+{"id": "hypothetical-goa", "category": "hypothetical", "text": "If I moved to Goa next year that would be nice", "expected": []}
+{"id": "if-moved-london", "category": "hypothetical", "text": "If I moved to London that would be nice", "expected": []}
+{"id": "if-lived-paris", "category": "hypothetical", "text": "If I live in Paris I would walk more", "expected": []}
+{"id": "maybe-live-tokyo", "category": "hypothetical", "text": "I maybe live in Tokyo someday", "expected": []}
+{"id": "thinking-bangalore", "category": "hypothetical", "text": "I'm thinking about a move to Bangalore", "expected": []}
+{"id": "might-live-delhi", "category": "hypothetical", "text": "I might live in Delhi someday", "expected": []}
+{"id": "if-write-rust", "category": "hypothetical", "text": "If I write Rust I will be happy", "expected": []}
+{"id": "would-be-nice-seattle", "category": "hypothetical", "text": "Living in Seattle would be nice", "expected": []}
+{"id": "going-to-move-bangalore", "category": "planned", "text": "I'm going to move to Bangalore", "expected": []}
+{"id": "planning-to-move-london", "category": "planned", "text": "I'm planning to move to London", "expected": []}
+{"id": "gonna-move-pune", "category": "planned", "text": "I'm gonna move to Pune", "expected": []}
+{"id": "going-to-write-rust", "category": "planned", "text": "I'm going to write Rust", "expected": []}
+{"id": "hope-to-live-sydney", "category": "planned", "text": "I hope to live in Sydney", "expected": []}
+{"id": "going-to-work-acme", "category": "planned", "text": "I'm going to work at Acme", "expected": []}
+{"id": "third-party-wife", "category": "third_party", "text": "My wife lives in Mumbai", "expected": [{"predicate": "lives_in", "object": "Mumbai", "op": "SET", "subject": "user.wife"}]}
+{"id": "husband-pune", "category": "third_party", "text": "My husband lives in Pune", "expected": [{"predicate": "lives_in", "object": "Pune", "op": "SET", "subject": "user.husband"}]}
+{"id": "partner-london", "category": "third_party", "text": "My partner lives in London", "expected": [{"predicate": "lives_in", "object": "London", "op": "SET", "subject": "user.partner"}]}
+{"id": "son-delhi", "category": "third_party", "text": "My son lives in Delhi", "expected": [{"predicate": "lives_in", "object": "Delhi", "op": "SET", "subject": "user.son"}]}
+{"id": "daughter-mumbai", "category": "third_party", "text": "My daughter lives in Mumbai", "expected": [{"predicate": "lives_in", "object": "Mumbai", "op": "SET", "subject": "user.daughter"}]}
+{"id": "mom-bangalore", "category": "third_party", "text": "My mom lives in Bangalore", "expected": [{"predicate": "lives_in", "object": "Bangalore", "op": "SET", "subject": "user.mom"}]}
+{"id": "dad-chennai", "category": "third_party", "text": "My dad lives in Chennai", "expected": [{"predicate": "lives_in", "object": "Chennai", "op": "SET", "subject": "user.dad"}]}
+{"id": "brother-tokyo", "category": "third_party", "text": "My brother lives in Tokyo", "expected": [{"predicate": "lives_in", "object": "Tokyo", "op": "SET", "subject": "user.brother"}]}
+{"id": "sister-paris", "category": "third_party", "text": "My sister lives in Paris", "expected": [{"predicate": "lives_in", "object": "Paris", "op": "SET", "subject": "user.sister"}]}
+{"id": "friend-seattle", "category": "third_party", "text": "My friend lives in Seattle", "expected": [{"predicate": "lives_in", "object": "Seattle", "op": "SET", "subject": "user.friend"}]}
+{"id": "diet-vegetarian", "category": "diet", "text": "I'm vegetarian", "expected": [{"predicate": "diet", "object": "vegetarian", "op": "SET"}]}
+{"id": "diet-vegan", "category": "diet", "text": "I'm vegan", "expected": [{"predicate": "diet", "object": "vegan", "op": "SET"}]}
+{"id": "diet-pescatarian", "category": "diet", "text": "I'm pescatarian", "expected": [{"predicate": "diet", "object": "pescatarian", "op": "SET"}]}
+{"id": "diet-gluten-free", "category": "diet", "text": "I'm gluten-free", "expected": [{"predicate": "diet", "object": "gluten-free", "op": "SET"}]}
+{"id": "diet-am-vegetarian", "category": "diet", "text": "I am vegetarian", "expected": [{"predicate": "diet", "object": "vegetarian", "op": "SET"}]}
+{"id": "diet-am-vegan", "category": "diet", "text": "I am vegan", "expected": [{"predicate": "diet", "object": "vegan", "op": "SET"}]}
+{"id": "diet-am-pescatarian", "category": "diet", "text": "I am pescatarian", "expected": [{"predicate": "diet", "object": "pescatarian", "op": "SET"}]}
+{"id": "diet-am-gluten-free", "category": "diet", "text": "I am gluten-free", "expected": [{"predicate": "diet", "object": "gluten-free", "op": "SET"}]}
+{"id": "work-acme", "category": "job", "text": "I work at Acme", "expected": [{"predicate": "works_at", "object": "Acme", "op": "SET"}]}
+{"id": "work-globex", "category": "job", "text": "I work at Globex", "expected": [{"predicate": "works_at", "object": "Globex", "op": "SET"}]}
+{"id": "work-google", "category": "job", "text": "I work at Google", "expected": [{"predicate": "works_at", "object": "Google", "op": "SET"}]}
+{"id": "work-microsoft", "category": "job", "text": "I work at Microsoft", "expected": [{"predicate": "works_at", "object": "Microsoft", "op": "SET"}]}
+{"id": "work-for-stripe", "category": "job", "text": "I work for Stripe", "expected": [{"predicate": "works_at", "object": "Stripe", "op": "SET"}]}
+{"id": "work-for-notion", "category": "job", "text": "I work for Notion", "expected": [{"predicate": "works_at", "object": "Notion", "op": "SET"}]}
+{"id": "title-engineer", "category": "job", "text": "I'm a software engineer", "expected": [{"predicate": "job_title", "object": "software engineer", "op": "SET"}]}
+{"id": "title-designer", "category": "job", "text": "I'm a designer", "expected": [{"predicate": "job_title", "object": "designer", "op": "SET"}]}
+{"id": "title-doctor", "category": "job", "text": "I'm a doctor", "expected": [{"predicate": "job_title", "object": "doctor", "op": "SET"}]}
+{"id": "title-teacher", "category": "job", "text": "I'm a teacher", "expected": [{"predicate": "job_title", "object": "teacher", "op": "SET"}]}
+{"id": "use-postgres", "category": "alias", "text": "I use Postgres", "expected": [{"predicate": "uses_tool", "object": "Postgres", "op": "ADD"}]}
+{"id": "use-postgresql", "category": "alias", "text": "I use PostgreSQL", "expected": [{"predicate": "uses_tool", "object": "PostgreSQL", "op": "ADD"}]}
+{"id": "use-kubernetes", "category": "alias", "text": "I use Kubernetes", "expected": [{"predicate": "uses_tool", "object": "Kubernetes", "op": "ADD"}]}
+{"id": "use-vim", "category": "alias", "text": "I use Vim", "expected": [{"predicate": "uses_tool", "object": "Vim", "op": "ADD"}]}
+{"id": "use-docker", "category": "alias", "text": "I use Docker", "expected": [{"predicate": "uses_tool", "object": "Docker", "op": "ADD"}]}
+{"id": "use-linux", "category": "alias", "text": "I use Linux", "expected": [{"predicate": "uses_tool", "object": "Linux", "op": "ADD"}]}
+{"id": "allergy-peanuts", "category": "allergy", "text": "I'm allergic to peanuts", "expected": [{"predicate": "allergic_to", "object": "peanuts", "op": "ADD"}]}
+{"id": "allergy-shellfish", "category": "allergy", "text": "I'm allergic to shellfish", "expected": [{"predicate": "allergic_to", "object": "shellfish", "op": "ADD"}]}
+{"id": "allergy-dairy", "category": "allergy", "text": "I'm allergic to dairy", "expected": [{"predicate": "allergic_to", "object": "dairy", "op": "ADD"}]}
+{"id": "allergy-gluten", "category": "allergy", "text": "I'm allergic to gluten", "expected": [{"predicate": "allergic_to", "object": "gluten", "op": "ADD"}]}
+{"id": "allergy-pollen", "category": "allergy", "text": "I'm allergic to pollen", "expected": [{"predicate": "allergic_to", "object": "pollen", "op": "ADD"}]}
+{"id": "allergy-cats", "category": "allergy", "text": "I'm allergic to cats", "expected": [{"predicate": "allergic_to", "object": "cats", "op": "ADD"}]}
+{"id": "prefer-vim", "category": "prefers", "text": "I prefer Vim", "expected": [{"predicate": "prefers", "object": "Vim", "op": "ADD"}]}
+{"id": "prefer-emacs", "category": "prefers", "text": "I prefer Emacs", "expected": [{"predicate": "prefers", "object": "Emacs", "op": "ADD"}]}
+{"id": "prefer-trains", "category": "prefers", "text": "I prefer trains", "expected": [{"predicate": "prefers", "object": "trains", "op": "ADD"}]}
+{"id": "prefer-email", "category": "prefers", "text": "I prefer email", "expected": [{"predicate": "prefers", "object": "email", "op": "ADD"}]}
+{"id": "prefer-walking", "category": "prefers", "text": "I prefer walking", "expected": [{"predicate": "prefers", "object": "walking", "op": "ADD"}]}
+{"id": "prefer-tea", "category": "prefers", "text": "I prefer tea", "expected": [{"predicate": "prefers", "object": "tea", "op": "ADD"}]}
+{"id": "name-priya", "category": "name", "text": "My name is Priya", "expected": [{"predicate": "name", "object": "Priya", "op": "SET"}]}
+{"id": "name-alex", "category": "name", "text": "My name is Alex", "expected": [{"predicate": "name", "object": "Alex", "op": "SET"}]}
+{"id": "name-sam", "category": "name", "text": "My name is Sam", "expected": [{"predicate": "name", "object": "Sam", "op": "SET"}]}
+{"id": "name-jordan", "category": "name", "text": "My name is Jordan", "expected": [{"predicate": "name", "object": "Jordan", "op": "SET"}]}
+{"id": "tz-ist", "category": "timezone", "text": "My timezone is IST", "expected": [{"predicate": "timezone", "object": "IST", "op": "SET"}]}
+{"id": "tz-pst", "category": "timezone", "text": "My timezone is PST", "expected": [{"predicate": "timezone", "object": "PST", "op": "SET"}]}
+{"id": "tz-utc", "category": "timezone", "text": "My timezone is UTC", "expected": [{"predicate": "timezone", "object": "UTC", "op": "SET"}]}
+{"id": "tz-est", "category": "timezone", "text": "My timezone is EST", "expected": [{"predicate": "timezone", "object": "EST", "op": "SET"}]}
+{"id": "pet-dog", "category": "pet", "text": "I have a dog", "expected": [{"predicate": "pet", "object": "dog", "op": "ADD"}]}
+{"id": "pet-cat", "category": "pet", "text": "I have a cat", "expected": [{"predicate": "pet", "object": "cat", "op": "ADD"}]}
+{"id": "pet-bird", "category": "pet", "text": "I have a bird", "expected": [{"predicate": "pet", "object": "bird", "op": "ADD"}]}
+{"id": "pet-dog-again", "category": "pet", "text": "I have a dog", "expected": [{"predicate": "pet", "object": "dog", "op": "ADD"}]}
+{"id": "moved-last-week", "category": "relative_date", "text": "I moved to Bangalore last week", "expected": [{"predicate": "lives_in", "object": "Bangalore", "op": "SET"}]}
+{"id": "moved-yesterday", "category": "relative_date", "text": "I moved to Pune yesterday", "expected": [{"predicate": "lives_in", "object": "Pune", "op": "SET"}]}
+{"id": "moved-last-month", "category": "relative_date", "text": "I moved to Tokyo last month", "expected": [{"predicate": "lives_in", "object": "Tokyo", "op": "SET"}]}
+{"id": "moved-last-year", "category": "relative_date", "text": "I moved to Nairobi last year", "expected": [{"predicate": "lives_in", "object": "Nairobi", "op": "SET"}]}
+{"id": "live-delhi-now", "category": "relative_date", "text": "I live in Boston now", "expected": [{"predicate": "lives_in", "object": "Boston", "op": "SET"}]}
+{"id": "moved-in-2024", "category": "relative_date", "text": "I moved to Dublin in 2024", "expected": [{"predicate": "lives_in", "object": "Dublin", "op": "SET"}]}
+{"id": "confirm-yes", "category": "confirmation", "text": "yes", "expected": [{"predicate": "lives_in", "object": "Delhi", "op": "SET"}], "skip_fake": true, "facts": [{"subject": "user", "predicate": "lives_in", "object": "Delhi"}]}
+{"id": "confirm-yeah", "category": "confirmation", "text": "yeah", "expected": [{"predicate": "lives_in", "object": "Delhi", "op": "SET"}], "skip_fake": true, "facts": [{"subject": "user", "predicate": "lives_in", "object": "Delhi"}]}
+{"id": "confirm-still", "category": "confirmation", "text": "still true", "expected": [{"predicate": "lives_in", "object": "Delhi", "op": "SET"}], "skip_fake": true, "facts": [{"subject": "user", "predicate": "lives_in", "object": "Delhi"}]}
+{"id": "confirm-thats-right", "category": "confirmation", "text": "that's right", "expected": [{"predicate": "lives_in", "object": "Delhi", "op": "SET"}], "skip_fake": true, "facts": [{"subject": "user", "predicate": "lives_in", "object": "Delhi"}]}
+{"id": "sarcasm-delhi", "category": "sarcasm", "text": "Yeah I live in Delhi, as if", "expected": [], "skip_fake": true}
+{"id": "sarcasm-paris", "category": "sarcasm", "text": "Oh I live in Paris right", "expected": [], "skip_fake": true}
+{"id": "sarcasm-goa", "category": "sarcasm", "text": "Obviously I live in Goa", "expected": [], "skip_fake": true}
+{"id": "sarcasm-london", "category": "sarcasm", "text": "Sure I live in London", "expected": [], "skip_fake": true}
+{"id": "sarcasm-rust", "category": "sarcasm", "text": "Yeah I write Rust, as if", "expected": [], "skip_fake": true}
+{"id": "sarcasm-nobody", "category": "sarcasm", "text": "I live in Delhi, said nobody ever", "expected": [], "skip_fake": true}
