@@ -6,6 +6,7 @@ import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from importlib.resources import files
 from pathlib import Path
 from typing import Literal
 
@@ -30,6 +31,7 @@ from tensemem.providers.llm.fake import FakeExtractor
 SystemName = Literal["tensemem", "concat", "similarity"]
 
 _SYSTEMS: tuple[SystemName, ...] = ("tensemem", "concat", "similarity")
+_PACKAGED = "tensebench_v1.jsonl"
 _WORD = re.compile(r"[A-Za-z0-9+#]+")
 _PRESENT = re.compile(r"\(previously [^)]*\)", re.IGNORECASE)
 
@@ -96,7 +98,7 @@ class Scenario(BaseModel):
 
 
 class SystemScore(BaseModel):
-    """Counts for one system. Rates use 1.0/0.0 when a denominator is 0."""
+    """Counts for one system. Rates are ``None`` when that metric was not scored."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -119,38 +121,38 @@ class SystemScore(BaseModel):
 
     @computed_field
     @property
-    def current_state_accuracy(self) -> float:
+    def current_state_accuracy(self) -> float | None:
         return _ratio(self.current_ok, self.current_n)
 
     @computed_field
     @property
-    def stale_fact_leak_rate(self) -> float:
-        return 0.0 if self.leak_n == 0 else self.leaks / self.leak_n
+    def stale_fact_leak_rate(self) -> float | None:
+        return _ratio(self.leaks, self.leak_n)
 
     @computed_field
     @property
-    def freshness_honesty(self) -> float:
+    def freshness_honesty(self) -> float | None:
         return _ratio(self.honest, self.honest_n)
 
     @computed_field
     @property
-    def contamination_rate(self) -> float:
-        return 0.0 if self.echo_n == 0 else self.contaminated / self.echo_n
+    def contamination_rate(self) -> float | None:
+        return _ratio(self.contaminated, self.echo_n)
 
     @computed_field
     @property
-    def correction_durability(self) -> float:
+    def correction_durability(self) -> float | None:
         return _ratio(self.durable, self.durable_n)
 
     @computed_field
     @property
-    def history_accuracy(self) -> float:
+    def history_accuracy(self) -> float | None:
         return _ratio(self.history_ok, self.history_n)
 
     @computed_field
     @property
-    def tokens_per_answer(self) -> float:
-        return 0.0 if self.token_n == 0 else self.token_sum / self.token_n
+    def tokens_per_answer(self) -> float | None:
+        return _ratio(self.token_sum, self.token_n)
 
 
 class BenchReport(BaseModel):
@@ -160,23 +162,22 @@ class BenchReport(BaseModel):
     systems: dict[str, SystemScore]
 
 
-def load_scenarios(path: Path) -> tuple[Scenario, ...]:
+def load_scenarios(path: Path | None = None) -> tuple[Scenario, ...]:
+    """Read JSONL scenarios. ``path`` defaults to the packaged pilot set."""
+    text = path.read_text(encoding="utf-8") if path is not None else _packaged_text()
     rows: list[Scenario] = []
-    for line in path.read_text(encoding="utf-8").splitlines():
+    for line in text.splitlines():
         if line.strip():
             rows.append(Scenario.model_validate_json(line))
     return tuple(rows)
 
 
 def default_scenarios_path() -> Path:
-    """``benchmarks/tensebench/v1.jsonl`` in a source checkout."""
-    repo = Path(__file__).resolve().parents[3] / "benchmarks" / "tensebench" / "v1.jsonl"
-    if repo.is_file():
-        return repo
-    cwd = Path.cwd() / "benchmarks" / "tensebench" / "v1.jsonl"
-    if cwd.is_file():
-        return cwd
-    msg = "could not find benchmarks/tensebench/v1.jsonl; pass --path"
+    """Filesystem path to the packaged pilot JSONL when it is not inside a zip."""
+    resource = files("tensemem.eval").joinpath(_PACKAGED)
+    if isinstance(resource, Path) and resource.is_file():
+        return resource
+    msg = "packaged TenseBench JSONL is not on the filesystem; pass --path"
     raise FileNotFoundError(msg)
 
 
@@ -186,7 +187,7 @@ def run_suite(
     systems: Sequence[str] | None = None,
 ) -> BenchReport:
     """Run every scenario against TenseMem and the published baselines."""
-    scenarios = load_scenarios(path or default_scenarios_path())
+    scenarios = load_scenarios(path)
     wanted = tuple(systems) if systems else _SYSTEMS
     acc = {name: _Acc() for name in wanted}
     for scenario in scenarios:
@@ -210,31 +211,21 @@ def format_report(report: BenchReport) -> str:
         if score is None:
             continue
         lines.append(name)
-        lines.append(
-            f"  current_state_accuracy: {score.current_state_accuracy:.3f}  "
-            f"({score.current_ok}/{score.current_n})"
-        )
-        lines.append(
-            f"  stale_fact_leak_rate:   {score.stale_fact_leak_rate:.3f}  "
-            f"({score.leaks}/{score.leak_n})"
-        )
-        lines.append(
-            f"  freshness_honesty:      {score.freshness_honesty:.3f}  "
-            f"({score.honest}/{score.honest_n})"
-        )
-        lines.append(
-            f"  contamination_rate:     {score.contamination_rate:.3f}  "
-            f"({score.contaminated}/{score.echo_n})"
-        )
-        lines.append(
-            f"  correction_durability:  {score.correction_durability:.3f}  "
-            f"({score.durable}/{score.durable_n})"
-        )
-        lines.append(
-            f"  history_accuracy:       {score.history_accuracy:.3f}  "
-            f"({score.history_ok}/{score.history_n})"
-        )
-        lines.append(f"  tokens_per_answer:      {score.tokens_per_answer:.1f}")
+        accuracy = _fmt_metric(score.current_state_accuracy, score.current_ok, score.current_n)
+        leak = _fmt_metric(score.stale_fact_leak_rate, score.leaks, score.leak_n)
+        honest = _fmt_metric(score.freshness_honesty, score.honest, score.honest_n)
+        echo = _fmt_metric(score.contamination_rate, score.contaminated, score.echo_n)
+        durable = _fmt_metric(score.correction_durability, score.durable, score.durable_n)
+        history = _fmt_metric(score.history_accuracy, score.history_ok, score.history_n)
+        lines.append(f"  current_state_accuracy: {accuracy}")
+        lines.append(f"  stale_fact_leak_rate:   {leak}")
+        lines.append(f"  freshness_honesty:      {honest}")
+        lines.append(f"  contamination_rate:     {echo}")
+        lines.append(f"  correction_durability:  {durable}")
+        lines.append(f"  history_accuracy:       {history}")
+        tokens = score.tokens_per_answer
+        token_text = "n/a" if tokens is None else f"{tokens:.1f}"
+        lines.append(f"  tokens_per_answer:      {token_text}")
     return "\n".join(lines)
 
 
@@ -276,23 +267,24 @@ def _score_tensemem(scenario: Scenario, acc: _Acc) -> None:
             if _signature(mem.state(scenario.id)) != before:
                 acc.contaminated += 1
         if scenario.correct is not None:
-            target = scenario.correct
-            wanted = normalize_value(target)
+            wanted = normalize_value(scenario.correct)
             match = next(
                 (
                     fact
                     for fact in mem.state(scenario.id).facts
-                    if fact.object == target or normalize_value(fact.object) == wanted
+                    if normalize_value(fact.object) == wanted
                 ),
                 None,
             )
+            acc.durable_n += 1
+            scored = match is not None or _scripted_deny(scenario, wanted)
             if match is not None:
                 mem.correct(match.id)
-            if scenario.rebuild:
-                mem.rebuild(scenario.id, wait=True)
-            acc.durable_n += 1
-            if _durable(mem, scenario.id, target):
-                acc.durable += 1
+            if scored:
+                if scenario.rebuild:
+                    mem.rebuild(scenario.id, wait=True)
+                if _durable(mem, scenario.id, scenario.correct):
+                    acc.durable += 1
         state = mem.state(scenario.id)
         ctx = mem.context(scenario.id, scenario.query)
         acc.token_sum += ctx.token_count
@@ -327,7 +319,7 @@ def _score_text(scenario: Scenario, answer: str, acc: _Acc) -> None:
     if scenario.history:
         acc.history_n += 1
         wanted = [item for values in scenario.history.values() for item in values]
-        if wanted and all(_mentions(answer, item) for item in wanted):
+        if wanted and _mentions_in_order(answer, wanted):
             acc.history_ok += 1
 
 
@@ -443,6 +435,36 @@ def _mentions(text: str, value: str) -> bool:
     return pattern.search(text) is not None
 
 
+def _mentions_in_order(text: str, values: Sequence[str]) -> bool:
+    cursor = 0
+    for value in values:
+        match = re.search(rf"(?<!\w){re.escape(value)}(?!\w)", text[cursor:], re.IGNORECASE)
+        if match is None:
+            return False
+        cursor += match.end()
+    return True
+
+
+def _scripted_deny(scenario: Scenario, wanted: str) -> bool:
+    for turn in scenario.turns:
+        if turn.ops is None:
+            continue
+        for op in turn.ops:
+            if op.op is OpKind.DENY and normalize_value(op.object) == wanted:
+                return True
+    return False
+
+
+def _packaged_text() -> str:
+    return files("tensemem.eval").joinpath(_PACKAGED).read_text(encoding="utf-8")
+
+
+def _fmt_metric(value: float | None, num: int, den: int) -> str:
+    if value is None or den == 0:
+        return "n/a"
+    return f"{value:.3f}  ({num}/{den})"
+
+
 @dataclass
 class _Acc:
     scenarios: int = 0
@@ -482,7 +504,7 @@ class _Acc:
         )
 
 
-def _ratio(num: int, den: int) -> float:
+def _ratio(num: int, den: int) -> float | None:
     if den == 0:
-        return 1.0
+        return None
     return num / den

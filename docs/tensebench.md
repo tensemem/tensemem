@@ -1,8 +1,8 @@
 # TenseBench
 
-TenseBench scores whether recalled memory is **safe to act on**. Extraction precision lives in the golden set (`python -m tensemem.eval`). This harness asks a different question: after state changes, does the system still present a current fact as if it were true?
+TenseBench scores whether recalled memory is **safe to act on**. Extraction precision lives in the golden set (`python -m tensemem.eval`). This harness asks a different question: after state changes, does the system still present an outdated fact as if it were current?
 
-The pilot (`benchmarks/tensebench/v1.jsonl`) is 30 hand-written conversations. CI runs it with `FakeExtractor` so the numbers are deterministic. A later slice grows the set and adds hosted-model runs.
+The pilot (`src/tensemem/eval/tensebench_v1.jsonl`, shipped in the package) is 30 hand-written conversations. CI runs it with `FakeExtractor` so the numbers are deterministic. A later slice grows the set and adds hosted-model runs.
 
 ```bash
 tensemem bench
@@ -21,7 +21,7 @@ python -m tensemem.eval bench
 | History accuracy | Version chain for a predicate matches the labeled order | 1.0 |
 | Tokens per answer | Mean `context()` tokens (or baseline text tokens) | report only |
 
-A scenario that does not exercise a metric is omitted from that denominator. Freshness cases never wait for extract. Echo cases feed `context().text` back into `add()`. Correction cases call `correct()` and may `rebuild()`.
+A scenario that does not exercise a metric is omitted from that denominator and prints as `n/a`. Freshness cases never wait for extract. Echo cases feed `context().text` back into `add()`. Correction cases call `correct()` (or a scripted `DENY`) and may `rebuild()`.
 
 ## Baselines
 
@@ -31,4 +31,4 @@ Do not treat concat or similarity as competing products; they exist so the leak 
 
 ## Adding a scenario
 
-One JSON object per line in `benchmarks/tensebench/v1.jsonl`. Rule-based `FakeExtractor` handles `I live in …`, `I moved to …`, `I write …`, and `I now only write …`. Other utterances set `"ops"` (including `"ops": []` when the extractor must stay silent). Entity aliases go in `"entities"`.
+One JSON object per line in `src/tensemem/eval/tensebench_v1.jsonl`. Rule-based `FakeExtractor` handles `I live in …`, `I moved to …`, `I write …`, and `I now only write …`. Other utterances set `"ops"` (including `"ops": []` when the extractor must stay silent). Entity aliases go in `"entities"`.

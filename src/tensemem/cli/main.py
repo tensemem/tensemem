@@ -271,9 +271,9 @@ def _cmd_stats(args: argparse.Namespace) -> int:
 
 
 def _cmd_bench(args: argparse.Namespace) -> int:
-    from tensemem.eval.tensebench import default_scenarios_path, format_report, run_suite
+    from tensemem.eval.tensebench import format_report, run_suite
 
-    report = run_suite(args.path or default_scenarios_path(), systems=args.systems)
+    report = run_suite(args.path, systems=args.systems)
     if args.json:
         print(json.dumps(report.model_dump(mode="json"), indent=2))
         return 0

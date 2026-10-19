@@ -13,7 +13,7 @@ A large hosted-model suite is out of reach for this slice: CI must stay determin
 
 1. **TenseBench is an engine benchmark**, not a replacement for the golden extract set. Scenarios are multi-turn conversations with expected ACTIVE triples, stale values, optional echo, correction, rebuild, and read-after-write probes.
 2. **CI uses `FakeExtractor`.** Utterances the fake model cannot parse carry scripted ops in the JSONL. Empty `ops` means "extract nothing".
-3. **Metrics are the safe-to-act-on set:** current-state accuracy, stale-fact leak rate, freshness honesty, contamination rate, correction durability, history accuracy, and tokens per answer. Denominators skip scenarios that do not exercise the metric.
+3. **Metrics are the safe-to-act-on set:** current-state accuracy, stale-fact leak rate, freshness honesty, contamination rate, correction durability, history accuracy, and tokens per answer. Denominators skip scenarios that do not exercise the metric; those rates are `n/a`, not 0 or 1.
 4. **Baselines in-repo are concatenative history and token-overlap episode retrieval.** They have no freshness flag (honesty 0 on probes) and no extract/correction loop (those rates are omitted). Product names stay out of the harness and docs.
 5. **The runner is `tensemem bench`** (also `python -m tensemem.eval bench`) so the method is as public as the numbers.
 

@@ -23,6 +23,6 @@ tensemem bench
 
 Global flags: `--db path.db`, `--json`, `--agent`, `--namespace`.
 
-`tensemem bench` does not open a database. It scores `benchmarks/tensebench/v1.jsonl` (override with `--path`) against TenseMem, concatenated history, and token-overlap retrieval. See [TenseBench](tensebench.md).
+`tensemem bench` does not open a database. It scores the packaged TenseBench pilot (override with `--path`) against TenseMem, concatenated history, and token-overlap retrieval. See [TenseBench](tensebench.md).
 
 `rebuild` from the CLI replays explicit ops and re-queues messages. Re-extract those messages from Python with `Memory(..., llm=...).rebuild(user_id, wait=True)`.

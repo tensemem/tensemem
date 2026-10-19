@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 
 from tensemem.eval.golden import default_cases_path, evaluate, load_cases
-from tensemem.eval.tensebench import default_scenarios_path, format_report, run_suite
+from tensemem.eval.tensebench import format_report, run_suite
 from tensemem.providers.llm.fake import FakeExtractor
 
 
@@ -41,7 +41,7 @@ def _bench(argv: list[str]) -> None:
     parser = argparse.ArgumentParser(description="Score TenseBench scenarios.")
     parser.add_argument("--path", type=Path, default=None)
     args = parser.parse_args(argv)
-    print(format_report(run_suite(args.path or default_scenarios_path())))
+    print(format_report(run_suite(args.path)))
 
 
 if __name__ == "__main__":
