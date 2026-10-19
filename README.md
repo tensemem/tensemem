@@ -2,7 +2,7 @@
 
 **Memory that knows its tenses.** Embedded, deterministic memory that AI agents can safely act on.
 
-> Status: pre-alpha. The deterministic API can set facts and render fenced `context()`. `add()` stores the message and a durable extract job; the worker that applies it is next.
+> Status: pre-alpha. The deterministic API can set facts and render fenced `context()`. `add()` plus `flush()` (or `wait=True`) runs extract jobs through `FakeExtractor` or any `LLMProvider`.
 
 ## The problem
 
@@ -19,17 +19,17 @@ Even memory that tracks changes usually can't tell you whether it's up to date, 
 - **The LLM proposes, the engine decides.** The model turns text into typed operations; deterministic, tested rules decide how state changes.
 - **No infrastructure.** A single SQLite file inside your process.
 
-## API (deterministic, no LLM yet)
+## API
 
 ```python
-from tensemem import Memory
+from tensemem import FakeExtractor, Memory
 
-mem = Memory()
+mem = Memory(llm=FakeExtractor())
 mem.register_predicate("lives_in")
-mem.set(user_id="u1", predicate="lives_in", value="Delhi")
-mem.set(user_id="u1", predicate="lives_in", value="Bangalore")
+mem.add("u1", "I live in Delhi", wait=True)
+mem.state(user_id="u1").values  # {"lives_in": "Delhi"}
 
-mem.state(user_id="u1").values  # {"lives_in": "Bangalore"}
+mem.set(user_id="u1", predicate="lives_in", value="Bangalore")
 history = mem.history(user_id="u1", predicate="lives_in")
 bangalore = next(fact for fact in history.facts if fact.object == "Bangalore")
 mem.correct(bangalore.id)  # restores the value it displaced ("Delhi")
@@ -38,7 +38,7 @@ ctx = mem.context(user_id="u1", max_tokens=200)
 print(ctx.text)  # fenced Markdown; ctx.freshness.is_current
 ```
 
-`mem.add(user_id, text)` writes the episode and an extract job in one transaction. Until a worker runs, `state()` / `context()` report `is_current=False`. Dead jobs can be dismissed or retried. `extract` / `normalize` prepare typed ops; tests use `FakeExtractor`.
+`mem.add(user_id, text)` writes the episode and an extract job in one transaction. Pass `llm=` to process jobs on a background thread; `flush()` or `add(..., wait=True)` waits until due jobs finish. Empty messages are skipped without an LLM call. Dead jobs can be dismissed or retried. Tests use `FakeExtractor`.
 
 ## Contributing
 

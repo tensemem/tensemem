@@ -219,6 +219,20 @@ def list_jobs(conn: sqlite3.Connection, *, scope_id: int | None = None) -> tuple
     return tuple(_to_job(row) for row in rows)
 
 
+def has_due_or_leased(conn: sqlite3.Connection, now: str) -> bool:
+    """True when the worker can still make progress at ``now``."""
+    row = conn.execute(
+        """
+        SELECT 1 FROM jobs
+        WHERE status = 'LEASED'
+           OR (status = 'QUEUED' AND next_run_at <= ?)
+        LIMIT 1
+        """,
+        (now,),
+    ).fetchone()
+    return row is not None
+
+
 def record_provider_success(conn: sqlite3.Connection) -> None:
     _meta_set(conn, _CIRCUIT_FAILURES, "0")
     conn.execute("DELETE FROM meta WHERE key = ?", (_CIRCUIT_OPEN_UNTIL,))

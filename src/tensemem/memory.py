@@ -1,8 +1,10 @@
-"""Deterministic Memory API: typed writes, no LLM (design §12.1)."""
+"""Sync Memory API: typed writes plus optional extract worker (design §12.1)."""
 
 from __future__ import annotations
 
 import sqlite3
+import threading
+import time
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -36,6 +38,8 @@ from tensemem.core.resolver import IncomingOp, resolve
 from tensemem.pipeline.normalize import normalize_ops
 from tensemem.pipeline.policy import apply_policy
 from tensemem.pipeline.snapshot import ExtractSnapshot, load_extract_snapshot
+from tensemem.pipeline.worker import process_one
+from tensemem.providers.llm.base import LLMProvider
 from tensemem.security.fence import strip as strip_fences
 from tensemem.security.fence import wrap as wrap_fence
 from tensemem.storage.sqlite import SqliteDatabase
@@ -54,13 +58,15 @@ from tensemem.storage.sqlite.facts import (
     restore_displaced,
 )
 from tensemem.storage.sqlite.jobs import dismiss as dismiss_job
-from tensemem.storage.sqlite.jobs import enqueue, list_jobs
+from tensemem.storage.sqlite.jobs import enqueue, has_due_or_leased, list_jobs
 from tensemem.storage.sqlite.jobs import retry as retry_job
 from tensemem.storage.sqlite.meta import get_fence_tag
 from tensemem.storage.sqlite.reads import forget_scope, read_explain, read_history, read_state
 from tensemem.storage.sqlite.registry import get_predicate, register_predicate
 from tensemem.storage.sqlite.scopes import get_or_create_scope, get_scope, get_scope_by_id
 from tensemem.storage.sqlite.snapshot import load_fact_view, load_snapshot, to_fact_view
+
+_WORKER_IDLE = 0.05
 
 
 class Memory:
@@ -71,10 +77,27 @@ class Memory:
         path: str | Path = "tensemem.db",
         *,
         clock: Clock = utc_now,
+        llm: LLMProvider | None = None,
     ) -> None:
         self._db = SqliteDatabase(path, clock=clock)
+        self._llm = llm
+        self._stop = threading.Event()
+        self._wake = threading.Event()
+        self._worker: threading.Thread | None = None
+        if llm is not None:
+            self._worker = threading.Thread(
+                target=self._run_worker,
+                name="tensemem-extract-worker",
+                daemon=True,
+            )
+            self._worker.start()
 
     def close(self) -> None:
+        self._stop.set()
+        self._wake.set()
+        if self._worker is not None:
+            self._worker.join(timeout=2)
+            self._worker = None
         self._db.close()
 
     def __enter__(self) -> Memory:
@@ -110,8 +133,16 @@ class Memory:
         *,
         agent_id: str = "",
         namespace: str = "default",
+        wait: bool = False,
+        timeout: float = 10.0,
     ) -> AddResult:
-        """Store a user message and an extract job in one transaction. No worker yet."""
+        """Store a user message and an extract job in one transaction.
+
+        With ``wait=True``, drain the worker until this job leaves the queue.
+        """
+        if wait and self._llm is None:
+            msg = "add(wait=True) needs Memory(..., llm=...)"
+            raise RuntimeError(msg)
         key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
 
         def write(conn: sqlite3.Connection) -> AddResult:
@@ -128,7 +159,54 @@ class Memory:
             job_id = enqueue(conn, kind=JobKind.EXTRACT, scope_id=scope.id, now=now, episode_id=seq)
             return AddResult(seq=seq, episode_ids=(public_id,), job_id=str(job_id))
 
-        return self._db.transaction(write)
+        result = self._db.transaction(write)
+        self._wake.set()
+        if wait:
+            self.flush(timeout=timeout)
+        return result
+
+    def flush(self, timeout: float = 10.0) -> None:
+        """Run due extract jobs until the queue is idle or ``timeout`` seconds elapse."""
+        if not self._has_work():
+            return
+        if self._llm is None:
+            msg = "flush() needs Memory(..., llm=...)"
+            raise RuntimeError(msg)
+        deadline = time.monotonic() + timeout
+        while True:
+            if process_one(self._db, self._llm):
+                if time.monotonic() >= deadline:
+                    break
+                continue
+            if not self._has_work():
+                return
+            if time.monotonic() >= deadline:
+                break
+            remaining = deadline - time.monotonic()
+            self._wake.wait(timeout=min(_WORKER_IDLE, max(remaining, 0.0)))
+            self._wake.clear()
+        if self._has_work():
+            msg = f"extract jobs still pending after {timeout}s"
+            raise TimeoutError(msg)
+
+    def _has_work(self) -> bool:
+        return self._db.read(lambda conn: has_due_or_leased(conn, self._db.now()))
+
+    def _run_worker(self) -> None:
+        provider = self._llm
+        if provider is None:
+            return
+        while not self._stop.is_set():
+            try:
+                worked = process_one(self._db, provider)
+            except RuntimeError:
+                return
+            except Exception:
+                worked = False
+            if worked:
+                continue
+            self._wake.wait(timeout=_WORKER_IDLE)
+            self._wake.clear()
 
     def jobs(
         self,
@@ -302,7 +380,7 @@ class Memory:
         agent_id: str = "",
         namespace: str = "default",
     ) -> ContextResult:
-        """Render current facts for a prompt. Waiting for a worker comes later."""
+        """Render current facts for a prompt. Does not wait for the extract worker."""
         key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
         as_of = self._db.now()[:10]
         policy = OnStale(on_stale)

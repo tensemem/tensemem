@@ -10,6 +10,7 @@ from tensemem.pipeline.snapshot import (
     RegistryEntry,
     load_extract_snapshot,
 )
+from tensemem.pipeline.worker import process_one, qualifies
 
 __all__ = [
     "PROMPT_VERSION",
@@ -21,5 +22,7 @@ __all__ = [
     "load_extract_snapshot",
     "normalize_ops",
     "planned_predicate",
+    "process_one",
+    "qualifies",
     "render_messages",
 ]

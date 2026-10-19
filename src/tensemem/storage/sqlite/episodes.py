@@ -45,6 +45,10 @@ def insert_episode(
     return int(row["id"]), public_id
 
 
+def get_episode(conn: sqlite3.Connection, episode_id: int) -> sqlite3.Row | None:
+    return conn.execute("SELECT * FROM episodes WHERE id = ?", (episode_id,)).fetchone()
+
+
 def set_episode_status(conn: sqlite3.Connection, episode_id: int, status: EpisodeStatus) -> None:
     conn.execute("UPDATE episodes SET status = ? WHERE id = ?", (status.value, episode_id))
 
