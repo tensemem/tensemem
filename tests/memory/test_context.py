@@ -64,6 +64,26 @@ def test_context_wait_times_out_and_raises() -> None:
             mem.context("u1", min_seq=added.seq, wait=0.2, on_stale="raise")
 
 
+def test_context_includes_unprocessed_messages() -> None:
+    with _memory() as mem:
+        mem.register_predicate("lives_in")
+        mem.set(user_id="u1", predicate="lives_in", value="Delhi")
+        mem.add("u1", "I just got a dog")
+        ctx = mem.context("u1")
+        assert ctx.freshness.is_current is False
+        assert "Said recently" in ctx.text
+        assert "I just got a dog" in ctx.text
+        assert "`lives in`: `Delhi`" in ctx.text
+
+
+def test_context_hot_buffer_hides_secrets() -> None:
+    with _memory() as mem:
+        mem.add("u1", "I live in Delhi sk-abcdefghijklmnopqrstuvwxyz123456")
+        ctx = mem.context("u1")
+        assert "sk-abcdefgh" not in ctx.text
+        assert "[REDACTED]" in ctx.text
+
+
 def test_min_seq_raise_and_custom_fence() -> None:
     with _memory() as mem:
         mem.register_predicate("lives_in")

@@ -1,4 +1,4 @@
-from tensemem.core.context import count_tokens, pack_facts, render_facts
+from tensemem.core.context import attach_hot_buffer, count_tokens, pack_facts, render_facts
 from tensemem.core.models import FactStatus, FactView
 
 
@@ -49,6 +49,16 @@ def test_pack_skips_oversized_group_and_keeps_later_fits() -> None:
     text, ids = pack_facts(facts, as_of="2026-10-18", max_tokens=40)
     assert "Pune" in text
     assert ids == ("city",)
+
+
+def test_hot_buffer_appends_and_drops_oldest_to_fit() -> None:
+    body = "## What I know about the user (as of 2026-10-18)\n\n- `lives in`: `Delhi`\n"
+    full = attach_hot_buffer(body, ("I live in Delhi", "I just got a dog"), max_tokens=80)
+    assert "Said recently" in full
+    assert "I just got a dog" in full
+    tiny = attach_hot_buffer(body, ("I just got a dog",), max_tokens=count_tokens(body))
+    assert "Said recently" not in tiny
+    assert tiny == body
 
 
 def test_count_tokens_uses_words_or_character_bound() -> None:

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Sequence
 
 from tensemem.core.models import FactView
 
@@ -53,6 +53,29 @@ def pack_facts(
     if count_tokens(text) > max_tokens:
         return "", ()
     return text, ids
+
+
+def attach_hot_buffer(body: str, messages: Sequence[str], *, max_tokens: int) -> str:
+    """Append unprocessed user messages, dropping the oldest until the budget fits."""
+    kept = list(messages)
+    while True:
+        hot = render_hot_buffer(kept)
+        if not hot:
+            return body
+        combined = f"{body.rstrip()}\n\n{hot}" if body.strip() else hot
+        if count_tokens(combined) <= max_tokens:
+            return combined
+        if not kept:
+            return body
+        kept.pop(0)
+
+
+def render_hot_buffer(messages: Sequence[str]) -> str:
+    if not messages:
+        return ""
+    lines = ["## Said recently (not yet processed)", ""]
+    lines.extend(f"- {_field(message)}" for message in messages)
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def _groups(facts: Iterable[FactView]) -> list[tuple[FactView, ...]]:

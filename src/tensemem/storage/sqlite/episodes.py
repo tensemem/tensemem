@@ -7,6 +7,9 @@ import sqlite3
 
 from tensemem.core.ids import new_ulid
 from tensemem.core.models import EpisodeKind, EpisodeRole, EpisodeStatus
+from tensemem.security.scrub import scrub
+
+_HOT_LIMIT = 8
 
 
 def insert_episode(
@@ -21,6 +24,7 @@ def insert_episode(
 ) -> tuple[int, str]:
     """Append an episode and return ``(seq, public_id)``. ``seq`` is ``episodes.id``."""
     public_id = new_ulid()
+    content = scrub(content)
     digest = hashlib.sha256(f"{public_id}\n{content}".encode()).hexdigest()
     row = conn.execute(
         """
@@ -43,6 +47,26 @@ def insert_episode(
         ),
     ).fetchone()
     return int(row["id"]), public_id
+
+
+def list_hot_buffer(
+    conn: sqlite3.Connection, scope_id: int, *, limit: int = _HOT_LIMIT
+) -> tuple[str, ...]:
+    """Newest-first unprocessed user messages, returned oldest-first for display."""
+    rows = conn.execute(
+        """
+        SELECT content FROM episodes
+        WHERE scope_id = ?
+          AND role = 'user'
+          AND kind = 'message'
+          AND status IN ('PENDING', 'FAILED')
+        ORDER BY id DESC
+        LIMIT ?
+        """,
+        (scope_id, limit),
+    ).fetchall()
+    newest_first = [str(row["content"]) for row in rows]
+    return tuple(reversed(newest_first))
 
 
 def get_episode(conn: sqlite3.Connection, episode_id: int) -> sqlite3.Row | None:

@@ -11,7 +11,7 @@ from contextlib import suppress
 from pathlib import Path
 
 from tensemem.core.clock import Clock, utc_now
-from tensemem.core.context import count_tokens, pack_facts
+from tensemem.core.context import attach_hot_buffer, count_tokens, pack_facts
 from tensemem.core.errors import UnknownFactError, UnknownPredicateError
 from tensemem.core.models import (
     AddResult,
@@ -53,7 +53,7 @@ from tensemem.storage.sqlite.entities import (
     resolve_entity,
     subject_label,
 )
-from tensemem.storage.sqlite.episodes import advance_watermark, insert_episode
+from tensemem.storage.sqlite.episodes import advance_watermark, insert_episode, list_hot_buffer
 from tensemem.storage.sqlite.facts import (
     ApplyContext,
     apply_mutations,
@@ -502,6 +502,8 @@ class Memory:
                 )
             body_budget = max(max_tokens - reserve, 0)
             body, ids = pack_facts(facts.facts, as_of=as_of, max_tokens=body_budget, query=query)
+            pending = () if scope is None else list_hot_buffer(conn, scope.id)
+            body = attach_hot_buffer(body, pending, max_tokens=body_budget)
             text = wrap_fence(body, tag) if fence else body
             return (
                 ContextResult(

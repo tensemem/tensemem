@@ -29,6 +29,7 @@ from tensemem.pipeline.policy import apply_policy
 from tensemem.pipeline.prompt import PROMPT_VERSION
 from tensemem.pipeline.snapshot import ExtractSnapshot, load_extract_snapshot
 from tensemem.providers.llm.base import LLMProvider, ProviderError
+from tensemem.security.scrub import scrub
 from tensemem.storage.sqlite.database import SqliteDatabase
 from tensemem.storage.sqlite.entities import (
     ensure_subject_entity,
@@ -156,7 +157,7 @@ def _claim(
         if episode is None:
             fail(conn, job.id, "missing episode", now=now, lease_until=token)
             continue
-        content = user_span(str(episode["content"]), tag)
+        content = scrub(user_span(str(episode["content"]), tag))
         if not qualifies(content):
             complete(conn, job.id, now=now, lease_until=token, episode_status=EpisodeStatus.SKIPPED)
             continue
