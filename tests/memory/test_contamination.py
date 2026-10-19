@@ -48,7 +48,13 @@ def test_user_text_beside_a_fence_still_extracts() -> None:
 
 
 def test_confirmation_cannot_create_a_fact() -> None:
-    fake = FakeExtractor({"yes": ExtractionResult(ops=(_op("Delhi", OpKind.SET, evidence="yes"),))})
+    fake = FakeExtractor(
+        {
+            "yes": ExtractionResult(
+                ops=(_op("Delhi", OpKind.SET, evidence="yes", is_confirmation=True),)
+            )
+        }
+    )
     with _memory(llm=fake) as mem:
         mem.register_predicate("lives_in")
         mem.add("u1", "yes", wait=True)
@@ -56,7 +62,13 @@ def test_confirmation_cannot_create_a_fact() -> None:
 
 
 def test_confirmation_reinforces_a_matching_fact() -> None:
-    fake = FakeExtractor({"yes": ExtractionResult(ops=(_op("Delhi", OpKind.SET, evidence="yes"),))})
+    fake = FakeExtractor(
+        {
+            "yes": ExtractionResult(
+                ops=(_op("Delhi", OpKind.SET, evidence="yes", is_confirmation=True),)
+            )
+        }
+    )
     with _memory(llm=fake) as mem:
         mem.register_predicate("lives_in")
         mem.add("u1", "I live in Delhi", wait=True)
@@ -94,13 +106,14 @@ def test_deny_restores_the_displaced_value() -> None:
         assert history.facts[0].status is FactStatus.ACTIVE
 
 
-def _op(city: str, kind: OpKind, *, evidence: str) -> ExtractedOp:
+def _op(city: str, kind: OpKind, *, evidence: str, is_confirmation: bool = False) -> ExtractedOp:
     return ExtractedOp(
         subject="user",
         predicate="lives_in",
         object=city,
         op=kind,
         evidence=evidence,
+        is_confirmation=is_confirmation,
     )
 
 

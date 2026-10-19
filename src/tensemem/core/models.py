@@ -169,7 +169,10 @@ class ExtractedOp(BaseModel):
     confidence: float = Field(default=1.0, ge=0.0, le=1.0)
     new_predicate: PredicateSpec | None = None
     evidence: str = ""
-    is_confirmation: bool = False
+    is_confirmation: bool = Field(
+        default=False,
+        description="True when the user only confirmed an existing fact, not a new claim.",
+    )
 
 
 class ExtractionResult(BaseModel):
