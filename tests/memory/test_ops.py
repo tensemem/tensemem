@@ -60,6 +60,41 @@ def test_rebuild_reextracts_messages() -> None:
         assert mem.state(user_id="u1").freshness.is_current
 
 
+def test_rebuild_and_import_keep_semicolons_in_values() -> None:
+    with _memory() as mem:
+        mem.register_predicate("uses_language", cardinality=Cardinality.MANY)
+        mem.add_value(user_id="u1", predicate="uses_language", value="Rust; Go")
+        mem.rebuild("u1")
+        assert mem.state(user_id="u1").values == {"uses_language": ("Rust; Go",)}
+        dump = mem.export_jsonl("u1")
+    with _memory() as other:
+        other.import_jsonl("u1", dump)
+        assert other.state(user_id="u1").values == {"uses_language": ("Rust; Go",)}
+
+
+def test_import_preserves_occurred_at() -> None:
+    past = "2024-01-15T09:00:00.000000Z"
+    with _memory() as mem:
+        mem.register_predicate("lives_in")
+        mem.add("u1", "I live in Delhi", occurred_at=past)
+        dump = mem.export_jsonl("u1")
+    assert past in dump
+    with _memory() as other:
+        other.import_jsonl("u1", dump)
+        assert past in other.export_jsonl("u1")
+
+
+def test_stats_unknown_user_is_empty() -> None:
+    with _memory() as mem:
+        mem.register_predicate("lives_in")
+        mem.set(user_id="u1", predicate="lives_in", value="Delhi")
+        missing = mem.stats("nobody")
+        assert missing.scopes == 0
+        assert missing.facts == 0
+        assert missing.episodes == 0
+        assert mem.stats("u1").facts == 1
+
+
 def test_stats_and_hooks_see_writes() -> None:
     events: list[str] = []
 

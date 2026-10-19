@@ -63,3 +63,13 @@ def test_export_import_backup_via_cli(tmp_path: Path, capsys: pytest.CaptureFixt
     assert main(["--db", str(db), "backup", str(copy)]) == 0
     with Memory(copy) as restored:
         assert restored.state(user_id="u1").values == {"lives_in": "Pune"}
+
+
+def test_inspect_missing_database_does_not_create_one(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    missing = tmp_path / "missing.db"
+    assert main(["--db", str(missing), "inspect", "--user", "u1"]) == 1
+    err = capsys.readouterr().err
+    assert "not found" in err
+    assert not missing.exists()

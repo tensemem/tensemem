@@ -7,6 +7,20 @@ import sqlite3
 from tensemem.core.models import MemoryStats, Scope
 
 
+def empty_stats() -> MemoryStats:
+    """Zero counts for a scope that does not exist yet."""
+    return MemoryStats(
+        scopes=0,
+        episodes=0,
+        facts=0,
+        queue_depth=0,
+        pending_episodes=0,
+        failed_episodes=0,
+        rejected_claims=0,
+        estimated_tokens=0,
+    )
+
+
 def load_stats(conn: sqlite3.Connection, scope: Scope | None) -> MemoryStats:
     """Database-wide counts, or one scope when ``scope`` is set."""
     scoped = scope is not None

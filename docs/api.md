@@ -17,7 +17,9 @@ state = mem.state(user_id="u1")
 history = mem.history(user_id="u1", predicate="lives_in")
 hits = mem.search(user_id="u1", query="where did I live")
 explained = mem.explain(history.facts[-1].id)
-ctx = mem.context(user_id="u1", query="plan a weekend", min_seq=added.seq, wait=1.5)
+ctx = mem.context(user_id="u1", query="plan a weekend")
+# ctx.freshness.is_current is False until extract runs.
+# Pass llm= and context(..., min_seq=added.seq, wait=1.5) to wait for it.
 
 mem.correct(explained.fact.id, replacement="Pune")
 mem.rebuild("u1", wait=True)

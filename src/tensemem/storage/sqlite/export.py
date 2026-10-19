@@ -7,7 +7,7 @@ import sqlite3
 from collections.abc import Iterator, Mapping
 from typing import Any, cast
 
-from tensemem.core.models import Scope
+from tensemem.core.models import EpisodeStatus, Scope
 from tensemem.storage.sqlite.episodes import list_episodes
 from tensemem.storage.sqlite.registry import list_predicates
 
@@ -31,6 +31,8 @@ def iter_records(conn: sqlite3.Connection, scope: Scope) -> Iterator[dict[str, A
             "pinned": predicate.pinned,
         }
     for episode in list_episodes(conn, scope.id):
+        if str(episode["status"]) == EpisodeStatus.DELETED.value:
+            continue
         yield {
             "type": "episode",
             "kind": str(episode["kind"]),

@@ -13,7 +13,7 @@ from pathlib import Path
 from tensemem.core.clock import Clock, utc_now
 from tensemem.core.context import attach_hot_buffer, count_tokens, pack_facts
 from tensemem.core.errors import UnknownFactError, UnknownPredicateError
-from tensemem.core.explicit import parse_explicit_ops
+from tensemem.core.explicit import format_explicit_ops, parse_explicit_ops
 from tensemem.core.models import (
     AddResult,
     Cardinality,
@@ -96,7 +96,7 @@ from tensemem.storage.sqlite.snapshot import (
     load_snapshot,
     to_fact_view,
 )
-from tensemem.storage.sqlite.stats import load_stats
+from tensemem.storage.sqlite.stats import empty_stats, load_stats
 
 _WORKER_IDLE = 0.05
 
@@ -197,6 +197,7 @@ class Memory:
         namespace: str = "default",
         wait: bool = False,
         timeout: float = 10.0,
+        occurred_at: str | None = None,
     ) -> AddResult:
         """Store a user message and an extract job in one transaction.
 
@@ -217,6 +218,7 @@ class Memory:
                 now=now,
                 kind=EpisodeKind.MESSAGE,
                 status=EpisodeStatus.PENDING,
+                occurred_at=occurred_at,
             )
             job_id = enqueue(conn, kind=JobKind.EXTRACT, scope_id=scope.id, now=now, episode_id=seq)
             return AddResult(seq=seq, episode_ids=(public_id,), job_id=str(job_id))
@@ -702,13 +704,22 @@ class Memory:
                 raise UnknownFactError(f"unknown fact: {fact_id}")
             view = to_fact_view(row)
             now = self._db.now()
-            pieces = [f"DENY {view.subject}.{view.predicate}={view.object}"]
+            logged = [
+                ExtractedOp(
+                    subject=view.subject,
+                    predicate=view.predicate,
+                    object=view.object,
+                    op=OpKind.DENY,
+                    evidence="DENY",
+                )
+            ]
             if replacement is not None:
-                pieces.append(f"SET {view.subject}.{view.predicate}={replacement}")
-            if note:
-                pieces.append(f"NOTE {note}")
+                logged.append(_op(view.subject, view.predicate, replacement, OpKind.SET))
             seq, public_id = insert_episode(
-                conn, scope_id=scope.id, content="; ".join(pieces), now=now
+                conn,
+                scope_id=scope.id,
+                content=format_explicit_ops(logged, note=note),
+                now=now,
             )
             mark_rejected(conn, fact, episode_id=seq, recorded_seq=seq, now=now)
             restore_displaced(conn, int(fact["id"]), episode_id=seq, now=now)
@@ -753,7 +764,14 @@ class Memory:
         if user_id is None:
             return self._db.read(lambda conn: load_stats(conn, None))
         key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
-        return self._db.read(lambda conn: load_stats(conn, get_scope(conn, key)))
+
+        def load(conn: sqlite3.Connection) -> MemoryStats:
+            scope = get_scope(conn, key)
+            if scope is None:
+                return empty_stats()
+            return load_stats(conn, scope)
+
+        return self._db.read(load)
 
     def export_jsonl(
         self,
@@ -804,13 +822,27 @@ class Memory:
                 applied += 1
             elif kind == "episode":
                 content = str(record.get("content", ""))
+                occurred = record.get("occurred_at")
+                occurred_at = None if occurred is None else str(occurred)
                 if str(record.get("kind")) == EpisodeKind.EXPLICIT_OP.value:
                     ops = parse_explicit_ops(content)
                     if ops:
-                        self._commit(user_id, ops, agent_id=agent_id, namespace=namespace)
+                        self._commit(
+                            user_id,
+                            ops,
+                            agent_id=agent_id,
+                            namespace=namespace,
+                            occurred_at=occurred_at,
+                        )
                         applied += 1
                 elif content.strip():
-                    self.add(user_id, content, agent_id=agent_id, namespace=namespace)
+                    self.add(
+                        user_id,
+                        content,
+                        agent_id=agent_id,
+                        namespace=namespace,
+                        occurred_at=occurred_at,
+                    )
                     applied += 1
         self._emit("import", {"user_id": user_id, "records": applied})
         return applied
@@ -842,6 +874,8 @@ class Memory:
             if scope is None:
                 return 0
             for episode in episodes:
+                if str(episode["status"]) == EpisodeStatus.DELETED.value:
+                    continue
                 kind = EpisodeKind(str(episode["kind"]))
                 seq = int(episode["id"])
                 if kind is EpisodeKind.EXPLICIT_OP:
@@ -889,14 +923,17 @@ class Memory:
         *,
         agent_id: str,
         namespace: str,
+        occurred_at: str | None = None,
     ) -> AddResult:
         key = ScopeKey(user_id=user_id, agent_id=agent_id, namespace=namespace)
-        content = "; ".join(f"{op.op.value} {op.subject}.{op.predicate}={op.object}" for op in ops)
+        content = format_explicit_ops(ops)
 
         def write(conn: sqlite3.Connection) -> AddResult:
             now = self._db.now()
             scope = get_or_create_scope(conn, key, now=now)
-            seq, public_id = insert_episode(conn, scope_id=scope.id, content=content, now=now)
+            seq, public_id = insert_episode(
+                conn, scope_id=scope.id, content=content, now=now, occurred_at=occurred_at
+            )
             _apply_ops(
                 conn,
                 scope,

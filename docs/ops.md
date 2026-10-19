@@ -23,7 +23,12 @@ For a durable single-node file, stream the WAL:
 litestream replicate tensemem.db s3://your-bucket/tensemem
 ```
 
-SQLite is opened in WAL mode with `synchronous=NORMAL` and `busy_timeout=5000`. Run Litestream beside the process that owns the file. Restore by stopping writers, then `litestream restore`.
+SQLite is opened in WAL mode with `synchronous=NORMAL` and `busy_timeout=5000`. Run Litestream beside the process that owns the file. Restore by stopping writers, then:
+
+```bash
+# Output path must not already exist.
+litestream restore -o tensemem-restored.db s3://your-bucket/tensemem
+```
 
 ## Migrations
 

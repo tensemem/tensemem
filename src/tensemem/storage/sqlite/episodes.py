@@ -21,11 +21,13 @@ def insert_episode(
     kind: EpisodeKind = EpisodeKind.EXPLICIT_OP,
     role: EpisodeRole = EpisodeRole.USER,
     status: EpisodeStatus = EpisodeStatus.PROCESSED,
+    occurred_at: str | None = None,
 ) -> tuple[int, str]:
     """Append an episode and return ``(seq, public_id)``. ``seq`` is ``episodes.id``."""
     public_id = new_ulid()
     content = scrub(content)
     digest = hashlib.sha256(f"{public_id}\n{content}".encode()).hexdigest()
+    when = occurred_at or now
     row = conn.execute(
         """
         INSERT INTO episodes (
@@ -40,7 +42,7 @@ def insert_episode(
             kind.value,
             role.value,
             content,
-            now,
+            when,
             now,
             digest,
             status.value,

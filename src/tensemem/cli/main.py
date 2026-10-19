@@ -107,8 +107,17 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _open(args: argparse.Namespace) -> Memory:
+def _open(args: argparse.Namespace, *, create: bool = False) -> Memory:
+    if not create and not _db_present(args.db):
+        raise FileNotFoundError(f"database not found: {args.db}")
     return Memory(args.db, start_worker=False)
+
+
+def _db_present(path: str) -> bool:
+    text = str(path)
+    if text == ":memory:" or text.startswith("file:"):
+        return True
+    return Path(text).expanduser().exists()
 
 
 def _scope(args: argparse.Namespace) -> _Scope:
@@ -220,7 +229,7 @@ def _cmd_export(args: argparse.Namespace) -> int:
 
 
 def _cmd_import(args: argparse.Namespace) -> int:
-    with _open(args) as mem:
+    with _open(args, create=True) as mem:
         n = mem.import_jsonl(args.user, args.path, **_scope(args))
     print(f"imported {n}")
     return 0
