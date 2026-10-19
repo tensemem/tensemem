@@ -1,0 +1,8 @@
+title = "TenseMem"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Constructed PEM fixture later rewritten at runtime; gitleaks still sees the old commit"
+commits = ["060af61f46b63c247dc81528f88d60aad7decc7a"]

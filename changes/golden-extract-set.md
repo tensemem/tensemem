@@ -3,6 +3,7 @@
 - Grow the labeled extract set to 150+ utterances covering moves, only/also/no longer, retract, deny, hedges, third parties, jobs, diet, tools, and relative dates.
 - Teach `FakeExtractor` those patterns so CI still scores precision/recall at 1.0 on the rule-based subset. Confirmations and sarcasm stay `skip_fake` for live models.
 - Harden runtime redaction (no comment allowlists; full GitHub tokens and private-key blocks), linear fence stripping, read-only SQLite URI mode, pinned packing and REPLACE_SET in linear time, extractor-proposed aliases that stay off the global registry, and a bounded evidence guard.
+- Allowlist the earlier constructed PEM fixture commit so the history scan matches HEAD, where that sample is assembled at runtime.
 
 # Why
 
