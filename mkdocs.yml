@@ -9,6 +9,7 @@ nav:
   - Concepts: concepts.md
   - API: api.md
   - CLI: cli.md
+  - MCP: mcp.md
   - TenseBench: tensebench.md
   - Golden extract: golden.md
   - Context latency: latency.md

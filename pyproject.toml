@@ -40,6 +40,7 @@ anthropic = ["anthropic>=1.0"]
 ollama = ["ollama>=0.4"]
 litellm = ["litellm>=1.50"]
 local = ["fastembed>=0.4"]
+mcp = ["mcp>=1.21,<2"]
 
 [project.scripts]
 tensemem = "tensemem.cli:main"

@@ -57,3 +57,4 @@ mem.forget(user_id="u1")
 - `export_jsonl` / `import_jsonl` replay predicates and episodes. Public ids change; use `backup()` for a bit-identical copy.
 - `Memory(..., hooks=[fn])` or `mem.on(fn)` receives `(event, payload)`. Hook errors are logged and ignored.
 - Structured logs go to the `tensemem` logger (`event=extraction scope_id=1 jobs=2`).
+- `tensemem mcp` maps `remember` / `recall_context` / `get_state` / `get_history` / `forget` onto this API. See [MCP](mcp.md).

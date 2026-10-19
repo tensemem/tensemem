@@ -30,3 +30,12 @@ tensemem search --user u1 "where did I live"
 ```
 
 Default database is `./tensemem.db`. Pass `--db path.db` to point at another file.
+
+An MCP host can use the same file:
+
+```bash
+pip install "tensemem[mcp]"
+tensemem mcp --db /absolute/path/tensemem.db --user u1
+```
+
+See [MCP](mcp.md) for the tool list and host config.
