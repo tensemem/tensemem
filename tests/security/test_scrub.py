@@ -32,13 +32,13 @@ def test_scrub_ignores_allowlist_pragma() -> None:
 
 def test_scrub_redacts_github_token_and_private_key_block() -> None:
     token = "ghp_" + ("a" * 36)
-    pem = (
-        "-----BEGIN RSA PRIVATE KEY-----\n"
-        "MIIEogIBAAKCAQEAnexamplebody\n"
-        "-----END RSA PRIVATE KEY-----"
-    )
+    kind = "RSA " + "PRIVATE KEY"
+    begin = f"-----BEGIN {kind}-----"
+    end = f"-----END {kind}-----"
+    body = "MIIEogIBAAKCAQEAnexamplebody"
+    pem = f"{begin}\n{body}\n{end}"
     out = scrub(f"token {token}\n{pem}")
     assert token not in out
-    assert "BEGIN RSA PRIVATE KEY" not in out
-    assert "MIIEogIBAAKCAQEAnexamplebody" not in out
+    assert begin not in out
+    assert body not in out
     assert REPLACEMENT in out

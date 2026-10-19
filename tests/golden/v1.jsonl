@@ -132,7 +132,7 @@
 {"id": "name-alex", "category": "name", "text": "My name is Alex", "expected": [{"predicate": "name", "object": "Alex", "op": "SET"}]}
 {"id": "name-sam", "category": "name", "text": "My name is Sam", "expected": [{"predicate": "name", "object": "Sam", "op": "SET"}]}
 {"id": "name-jordan", "category": "name", "text": "My name is Jordan", "expected": [{"predicate": "name", "object": "Jordan", "op": "SET"}]}
-{"id": "tz-ist", "category": "timezone", "text": "My timezone is IST", "expected": [{"predicate": "timezone", "object": "IST", "op": "SET"}]}
+{"id": "tz-kolkata", "category": "timezone", "text": "My timezone is Asia/Kolkata", "expected": [{"predicate": "timezone", "object": "Asia/Kolkata", "op": "SET"}]}
 {"id": "tz-pst", "category": "timezone", "text": "My timezone is PST", "expected": [{"predicate": "timezone", "object": "PST", "op": "SET"}]}
 {"id": "tz-utc", "category": "timezone", "text": "My timezone is UTC", "expected": [{"predicate": "timezone", "object": "UTC", "op": "SET"}]}
 {"id": "tz-est", "category": "timezone", "text": "My timezone is EST", "expected": [{"predicate": "timezone", "object": "EST", "op": "SET"}]}
