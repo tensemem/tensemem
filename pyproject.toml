@@ -29,6 +29,7 @@ classifiers = [
 ]
 dependencies = [
   "dateparser>=1.4.3",
+  "detect-secrets>=1.5",
   "pydantic>=2.12",
   "python-ulid>=3.1,<5",
 ]

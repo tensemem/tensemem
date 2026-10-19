@@ -128,12 +128,13 @@ def test_queued_messages_extract_in_one_call() -> None:
 
 
 def test_secret_in_message_is_redacted_and_city_still_extracts() -> None:
+    key = "sk-" + "Xi8tcNiHV9awbCcvilTe" + "T3BlbkFJ" + "3UDnpdEwNNm6wVBpYM0o"
     with _memory() as mem:
         mem.register_predicate("lives_in")
-        mem.add("u1", "I live in Delhi sk-abcdefghijklmnopqrstuvwxyz123456", wait=True)
+        mem.add("u1", f"I live in Delhi {key}", wait=True)
         assert mem.state("u1").values == {"lives_in": "Delhi"}
         ctx = mem.context("u1")
-        assert "sk-abcdefgh" not in ctx.text
+        assert key not in ctx.text
         assert "Said recently" not in ctx.text
 
 

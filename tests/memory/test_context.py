@@ -77,10 +77,11 @@ def test_context_includes_unprocessed_messages() -> None:
 
 
 def test_context_hot_buffer_hides_secrets() -> None:
+    key = "sk-" + "Xi8tcNiHV9awbCcvilTe" + "T3BlbkFJ" + "3UDnpdEwNNm6wVBpYM0o"
     with _memory() as mem:
-        mem.add("u1", "I live in Delhi sk-abcdefghijklmnopqrstuvwxyz123456")
+        mem.add("u1", f"I live in Delhi {key}")
         ctx = mem.context("u1")
-        assert "sk-abcdefgh" not in ctx.text
+        assert key not in ctx.text
         assert "[REDACTED]" in ctx.text
 
 

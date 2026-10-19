@@ -1,7 +1,7 @@
 # What
 
 - `context()` includes a hot buffer of unprocessed user messages so the agent can see what was just said before extract finishes.
-- Incoming episode text is scrubbed of high-confidence secrets (API keys, password assignments, cards, SSNs) before storage and before the model call.
+- Incoming episode text is passed through detect-secrets (named credential plugins) and redacted before storage and before the model call.
 
 # Why
 

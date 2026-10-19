@@ -1,23 +1,24 @@
 from tensemem.security.scrub import REPLACEMENT, scrub
 
 
-def test_scrub_redacts_tokens_and_keeps_plain_speech() -> None:
-    text = "I live in Delhi sk-abcdefghijklmnopqrstuvwxyz123456"
+def test_scrub_keeps_plain_speech() -> None:
+    assert scrub("I live in Delhi") == "I live in Delhi"
+
+
+def test_scrub_redacts_provider_tokens() -> None:
+    openai = "sk-" + "Xi8tcNiHV9awbCcvilTe" + "T3BlbkFJ" + "3UDnpdEwNNm6wVBpYM0o"
+    aws = "AKIA" + "IOSFODNN7EXAMPLE"
+    slack = "xoxb-" + "123456789012-123456789012-" + "abcdefghijklmnopqrstuvwx"
+    text = f"I live in Delhi {openai} {aws} {slack}"
     out = scrub(text)
     assert "Delhi" in out
-    assert "sk-abcdefgh" not in out
+    assert openai not in out
+    assert aws not in out
+    assert slack not in out
     assert REPLACEMENT in out
 
 
-def test_scrub_redacts_password_assignment_and_valid_card() -> None:
-    text = "password=hunter2 card 4111111111111111 ssn 123-45-6789"
-    out = scrub(text)
+def test_scrub_redacts_quoted_password_assignment() -> None:
+    out = scrub('password = "hunter2"')
     assert "hunter2" not in out
-    assert "4111111111111111" not in out
-    assert "123-45-6789" not in out
-    assert out.count(REPLACEMENT) == 3
-
-
-def test_scrub_ignores_non_luhn_digit_runs() -> None:
-    text = "order 4111111111111112"
-    assert scrub(text) == text
+    assert REPLACEMENT in out

@@ -3,8 +3,8 @@ revision = 5
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.14' and sys_platform == 'emscripten'",
-    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
     "python_full_version >= '3.14' and sys_platform != 'emscripten'",
+    "python_full_version >= '3.12' and python_full_version < '3.14' and sys_platform == 'emscripten'",
     "(python_full_version < '3.14' and sys_platform != 'emscripten') or (python_full_version < '3.12' and sys_platform == 'emscripten')",
 ]
 
@@ -464,6 +464,19 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/c7/5d/bd21ba1519b6b1e222b29878301d2e1fb928e890dc7d085fa4222ac5671b/dateparser-1.4.3.tar.gz", hash = "sha256:bab8c43a746266e68142f4926e69438ce551441aa88e54e78bb6410bf3ee7000", size = 362152, upload-time = "2026-09-03T10:07:54.545Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/30/5f/63f927b5ffd1cc2c030fc2bd362bf920890e8806cf42f701198de5b3f9c7/dateparser-1.4.3-py3-none-any.whl", hash = "sha256:cbce86c64e0cea5c54c84c015d34c903d46c51bfad50632bf2f05a6141d10c05", size = 322384, upload-time = "2026-09-03T10:07:52.913Z" },
+]
+
+[[package]]
+name = "detect-secrets"
+version = "1.5.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyyaml" },
+    { name = "requests" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/69/67/382a863fff94eae5a0cf05542179169a1c49a4c8784a9480621e2066ca7d/detect_secrets-1.5.0.tar.gz", hash = "sha256:6bb46dcc553c10df51475641bb30fd69d25645cc12339e46c824c1e0c388898a", size = 97351, upload-time = "2024-05-06T17:46:19.721Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/4e/5e/4f5fe4b89fde1dc3ed0eb51bd4ce4c0bca406246673d370ea2ad0c58d747/detect_secrets-1.5.0-py3-none-any.whl", hash = "sha256:e24e7b9b5a35048c313e983f76c4bd09dad89f045ff059e354f9943bf45aa060", size = 120341, upload-time = "2024-05-06T17:46:16.628Z" },
 ]
 
 [[package]]
@@ -2221,6 +2234,7 @@ name = "tensemem"
 source = { editable = "." }
 dependencies = [
     { name = "dateparser" },
+    { name = "detect-secrets" },
     { name = "pydantic" },
     { name = "python-ulid" },
 ]
@@ -2251,6 +2265,7 @@ dev = [
 requires-dist = [
     { name = "anthropic", marker = "extra == 'anthropic'", specifier = ">=1.0" },
     { name = "dateparser", specifier = ">=1.4.3" },
+    { name = "detect-secrets", specifier = ">=1.5" },
     { name = "litellm", marker = "extra == 'litellm'", specifier = ">=1.50" },
     { name = "ollama", marker = "extra == 'ollama'", specifier = ">=0.4" },
     { name = "openai", marker = "extra == 'openai'", specifier = ">=1.40" },
