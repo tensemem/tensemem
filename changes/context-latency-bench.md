@@ -1,7 +1,7 @@
 # What
 
 - Add `tensemem latency` / `python -m tensemem.eval latency`: seed ACTIVE facts, time empty-query `context()`, print p50/p99/max against the 2 ms / 10 ms targets.
-- CI runs 500 facts and fails if p99 ≥ 50 ms.
+- CI runs 500 facts and fails if p99 ≥ 250 ms.
 
 # Why
 

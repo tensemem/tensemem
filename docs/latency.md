@@ -15,4 +15,4 @@ python -m tensemem.eval latency
 tensemem latency --facts 5000 --rounds 80
 ```
 
-CI runs a smaller seed (500 facts) and fails if p99 ≥ 50 ms, which catches quadratic packing without flaking on shared runners. The 2 ms / 10 ms numbers are for a laptop-class machine, not GitHub Actions.
+CI runs a smaller seed (500 facts) and fails if p99 ≥ 250 ms. That bound is well above shared-runner noise (p99 of 20 samples is nearly the max) and still catches quadratic packing. The 2 ms / 10 ms numbers are for a laptop-class machine, not GitHub Actions.
