@@ -318,8 +318,7 @@ def _score_text(scenario: Scenario, answer: str, acc: _Acc) -> None:
             acc.leaks += 1
     if scenario.history:
         acc.history_n += 1
-        wanted = [item for values in scenario.history.values() for item in values]
-        if wanted and _mentions_in_order(answer, wanted):
+        if all(_mentions_in_order(answer, values) for values in scenario.history.values()):
             acc.history_ok += 1
 
 

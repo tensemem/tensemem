@@ -1,4 +1,6 @@
+import json
 from importlib.resources import files
+from pathlib import Path
 
 from tensemem.eval.tensebench import (
     default_scenarios_path,
@@ -63,3 +65,35 @@ def test_concat_leaks_stale_cities() -> None:
     assert score.correction_durability is None
     text = format_report(report)
     assert "n/a" in text
+
+
+def test_concat_history_is_per_predicate(tmp_path: Path) -> None:
+    path = tmp_path / "interleaved.jsonl"
+    path.write_text(
+        json.dumps(
+            {
+                "id": "interleaved",
+                "category": "history",
+                "predicates": [
+                    {"name": "lives_in"},
+                    {"name": "uses_language", "cardinality": "MANY"},
+                ],
+                "turns": [
+                    {"text": "I live in Delhi"},
+                    {"text": "I write Python"},
+                    {"text": "I moved to Bangalore"},
+                    {"text": "I write Go"},
+                ],
+                "query": "what do I know",
+                "history": {
+                    "lives_in": ["Delhi", "Bangalore"],
+                    "uses_language": ["Python", "Go"],
+                },
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    score = run_suite(path, systems=("concat",)).systems["concat"]
+    assert score.history_n == 1
+    assert score.history_ok == 1
