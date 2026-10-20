@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from tensemem.core.models import ContextResult
 from tensemem.memory import Memory
 
@@ -49,7 +51,7 @@ class TenseMemChatMemory:
         )
 
     async def aput(self, user_id: str, text: str, *, agent_id: str = "") -> None:
-        self.put(user_id, text, agent_id=agent_id)
+        await asyncio.to_thread(self.put, user_id, text, agent_id=agent_id)
 
     async def aget(self, user_id: str, query: str = "", *, agent_id: str = "") -> ContextResult:
-        return self.get(user_id, query, agent_id=agent_id)
+        return await asyncio.to_thread(self.get, user_id, query, agent_id=agent_id)
