@@ -74,7 +74,7 @@ packages = ["src/tensemem"]
 "src/tensemem/eval/locomo_pilot.json" = "tensemem/eval/locomo_pilot.json"
 
 [tool.hatch.build.targets.sdist]
-include = ["src", "tests", "examples", "docs", "README.md", "LICENSE", "pyproject.toml", "mkdocs.yml"]
+include = ["src", "tests", "examples", "docs", "studio", "README.md", "LICENSE", "pyproject.toml", "mkdocs.yml"]
 
 [tool.ruff]
 line-length = 100

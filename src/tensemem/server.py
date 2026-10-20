@@ -6,14 +6,18 @@ import asyncio
 import importlib
 import json
 import sys
+import time
 from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, Final, cast
 
-from tensemem.auth import bind_warning, require_auth
+from tensemem.auth import bind_warning, health_path
+from tensemem.core.errors import UnknownFactError, UnknownJobError
 from tensemem.mcp import call_tool, seed_starter
 from tensemem.memory import Memory
+from tensemem.ops import allow_request, handle_ops, log_request, provider_settings, set_provider
 from tensemem.providers.llm.fake import FakeExtractor
+from tensemem.studio_http import handle_inspect
 
 _MISSING_EXTRA = "tensemem serve needs tensemem[server]"
 _DEFAULT_HOST = "127.0.0.1"
@@ -24,6 +28,25 @@ ROUTES: Final[tuple[tuple[str, str], ...]] = (
     ("POST", "/v1/context"),
     ("GET", "/v1/state"),
     ("GET", "/v1/history"),
+    ("GET", "/v1/scopes"),
+    ("GET", "/v1/stats"),
+    ("GET", "/v1/jobs"),
+    ("POST", "/v1/jobs:retry"),
+    ("POST", "/v1/jobs:dismiss"),
+    ("GET", "/v1/explain"),
+    ("GET", "/v1/search"),
+    ("GET", "/v1/graph"),
+    ("POST", "/v1/facts:correct"),
+    ("POST", "/v1/insights/compare"),
+    ("POST", "/v1/insights/echo"),
+    ("GET", "/v1/insights/act-risk"),
+    ("POST", "/v1/studio/sample"),
+    ("GET", "/v1/ops/keys"),
+    ("POST", "/v1/ops/keys"),
+    ("POST", "/v1/ops/keys:revoke"),
+    ("GET", "/v1/ops/requests"),
+    ("GET", "/v1/ops/provider"),
+    ("PUT", "/v1/ops/provider"),
     ("DELETE", "/v1/scopes/{user_id}"),
     ("GET", "/health"),
 )
@@ -57,6 +80,20 @@ def dispatch(
             return 200, _tool(mem, "get_state", params, agent_id=agent_id, namespace=namespace)
         if verb == "GET" and route == "/v1/history":
             return 200, _tool(mem, "get_history", params, agent_id=agent_id, namespace=namespace)
+        ops = handle_ops(mem, verb, route, query=params, body=payload)
+        if ops is not None:
+            return ops
+        inspected = handle_inspect(
+            mem,
+            verb,
+            route,
+            query=params,
+            body=payload,
+            agent_id=agent_id,
+            namespace=namespace,
+        )
+        if inspected is not None:
+            return inspected
         forgotten = _scope_user(verb, route)
         if forgotten is not None:
             return 200, _tool(
@@ -66,6 +103,8 @@ def dispatch(
                 agent_id=agent_id,
                 namespace=namespace,
             )
+    except (UnknownFactError, UnknownJobError) as extra:
+        return 404, {"error": str(extra)}
     except ValueError as extra:
         return 400, {"error": str(extra)}
     return 404, {"error": "not found"}
@@ -92,6 +131,9 @@ def serve(
         print(f"tensemem serve: {warning}", file=sys.stderr)
     with Memory(path, llm=FakeExtractor(), start_worker=False) as mem:
         seed_starter(mem)
+        settings = provider_settings(mem)
+        if settings["llm"] != "fake" or settings["embedder"] != "none":
+            set_provider(mem, llm=settings["llm"], embedder=settings["embedder"])
         run_http(
             mem,
             host=host,
@@ -112,11 +154,14 @@ def create_app(
     """Build a FastAPI app. Import happens here so the extra stays optional."""
     fastapi = _load("fastapi", "FastAPI")
     json_response = _load("fastapi.responses", "JSONResponse")
+    request_type = _load("fastapi", "Request")
     app = fastapi(title="TenseMem", version="0.0.1")
 
     async def handle(request: Any) -> Any:
         authorization = request.headers.get("authorization")
-        if not require_auth(request.method, request.url.path, authorization, token):
+        path = request.url.path
+        method = request.method
+        if not health_path(path) and not allow_request(mem, authorization, token):
             return json_response({"error": "unauthorized"}, status_code=401)
         body: Mapping[str, object] = {}
         if request.method in {"POST", "PUT", "PATCH"}:
@@ -137,8 +182,7 @@ def create_app(
                     return json_response({"error": "JSON object required"}, status_code=400)
                 body = cast(dict[str, object], parsed)
         query = dict(request.query_params)
-        path = request.url.path
-        method = request.method
+        started = time.monotonic()
         status, payload = await asyncio.to_thread(
             dispatch,
             mem,
@@ -149,10 +193,22 @@ def create_app(
             agent_id=agent_id,
             namespace=namespace,
         )
+        if str(path).startswith("/v1/"):
+            log_request(
+                mem,
+                method=method,
+                path=str(path),
+                status=status,
+                latency_ms=int((time.monotonic() - started) * 1000),
+                authorization=authorization,
+            )
         return json_response(payload, status_code=status)
 
+    # from __future__ import annotations stores "Any"; FastAPI needs the Request class.
+    handle.__annotations__["request"] = request_type
     for method, route in ROUTES:
         app.add_api_route(route, handle, methods=[method])
+    app.add_api_route("/v1/{rest:path}", handle, methods=["GET", "POST", "PUT", "DELETE"])
     return app
 
 

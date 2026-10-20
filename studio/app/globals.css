@@ -1,0 +1,48 @@
+:root {
+  --bg: #0c0d10;
+  --panel: #14161c;
+  --ink: #e8e4d9;
+  --muted: #8b8678;
+  --line: #2a2d36;
+  --now: #7dce9a;
+  --was: #d4a574;
+  --wait: #e6c15a;
+  --stop: #e07a6a;
+  --accent: #7aa2f7;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 "Iowan Old Style", "Palatino Linotype", Palatino, serif; }
+a { color: inherit; text-decoration: none; }
+button, input, textarea, select {
+  font: inherit; color: inherit; background: #1b1e26; border: 1px solid var(--line); border-radius: 6px; padding: 0.45rem 0.7rem;
+}
+button { cursor: pointer; }
+button.primary { background: #243024; border-color: #3a5a3f; color: var(--now); }
+main { padding: 1.25rem 1.5rem 3rem; max-width: 1200px; }
+nav.top {
+  display: flex; gap: 1rem; align-items: center; padding: 0.8rem 1.5rem; border-bottom: 1px solid var(--line);
+  background: #101218; position: sticky; top: 0; z-index: 2; flex-wrap: wrap;
+}
+nav.top strong { letter-spacing: 0.04em; }
+nav.top a { color: var(--muted); }
+nav.top a.active { color: var(--ink); }
+.row { display: flex; gap: 0.75rem; flex-wrap: wrap; align-items: center; }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 1rem 1.1rem; }
+.badge { display: inline-block; padding: 0.1rem 0.45rem; border-radius: 999px; font-size: 12px; letter-spacing: 0.04em; }
+.badge.act { background: #1c3324; color: var(--now); }
+.badge.wait { background: #332c14; color: var(--wait); }
+.badge.stop { background: #3a1e1b; color: var(--stop); }
+.badge.was { background: #322618; color: var(--was); }
+.lane { display: grid; grid-template-columns: 140px 1fr; gap: 0.75rem; padding: 0.6rem 0; border-bottom: 1px solid var(--line); }
+.dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 0.35rem; }
+.dot.now { background: var(--now); }
+.dot.was { background: var(--was); }
+pre, .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; white-space: pre-wrap; }
+.err { color: var(--stop); }
+h1 { font-weight: 500; font-size: 1.6rem; margin: 0 0 0.4rem; }
+h2 { font-weight: 500; font-size: 1.15rem; margin: 1.4rem 0 0.5rem; }
+p.lead { color: var(--muted); max-width: 42rem; }
+.step { border-left: 2px solid var(--line); padding-left: 0.8rem; margin: 0.8rem 0; }
+.cmp { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.8rem; }
+@media (max-width: 900px) { .cmp { grid-template-columns: 1fr; } }

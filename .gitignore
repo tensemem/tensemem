@@ -10,3 +10,6 @@ build/
 .pyright/
 *.db
 .DS_Store
+studio/node_modules/
+studio/.next/
+studio/tsconfig.tsbuildinfo

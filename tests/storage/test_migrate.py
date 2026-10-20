@@ -98,7 +98,7 @@ def test_open_applies_newer_migrations_to_v2_fixture(tmp_path: Path) -> None:
 
     with SqliteDatabase(path) as db:
         versions = db.read(_schema_versions)
-        assert versions == [1, 2, 3]
+        assert versions == [1, 2, 3, 4]
     with Memory(path) as mem:
         assert mem.state(user_id="u1").values == {"lives_in": "Delhi"}
         hits = mem.search(user_id="u1", query="Delhi")

@@ -11,7 +11,7 @@ tensemem --db /absolute/path/tensemem.db serve --port 8080
 
 Default bind is `127.0.0.1:8080`. `--db`, `--agent`, and `--namespace` are root flags (before `serve`).
 
-When `--token` or `TENSEMEM_TOKEN` is set, every route except `GET /health` needs `Authorization: Bearer <token>`. This process does not configure TLS. Keep it on loopback. If `--host` exposes it beyond loopback, put a TLS-terminating reverse proxy in front that also authorizes the `user_id` callers send.
+When `--token` or `TENSEMEM_TOKEN` is set, or any Studio key has been issued, every route except `GET /health` needs `Authorization: Bearer`. Issued keys and the bootstrap token both work. This process does not configure TLS. Keep it on loopback. If `--host` exposes it beyond loopback, put a TLS-terminating reverse proxy in front that also authorizes the `user_id` callers send.
 
 ## Routes
 
@@ -23,6 +23,24 @@ When `--token` or `TENSEMEM_TOKEN` is set, every route except `GET /health` need
 | `GET` | `/v1/history` | `history()` — query `user_id`, optional `predicate` |
 | `DELETE` | `/v1/scopes/{user_id}` | `forget()` |
 | `GET` | `/health` | `{ "ok": true }` |
+| `GET` | `/v1/scopes` | stored users |
+| `GET` | `/v1/stats` | `stats()` |
+| `GET` | `/v1/jobs` | outbox |
+| `POST` | `/v1/jobs:retry` | `retry_job()` |
+| `POST` | `/v1/jobs:dismiss` | `dismiss_job()` |
+| `GET` | `/v1/explain` | `explain(fact_id)` |
+| `GET` | `/v1/search` | `search()` |
+| `GET` | `/v1/graph` | fact graph |
+| `POST` | `/v1/facts:correct` | `correct()` |
+| `POST` | `/v1/insights/compare` | TenseMem vs concat vs overlap |
+| `POST` | `/v1/insights/echo` | feed context back in |
+| `GET` | `/v1/insights/act-risk` | safe-to-act verdict |
+| `POST` | `/v1/studio/sample` | GST / itinerary sample |
+| `GET/POST` | `/v1/ops/keys` | issue / list hashed keys |
+| `GET` | `/v1/ops/requests` | request log |
+| `GET/PUT` | `/v1/ops/provider` | llm / embedder names |
+
+Studio (`docs/studio.md`) is a Next.js client for these routes.
 
 `POST /v1/memories:add`:
 

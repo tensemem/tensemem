@@ -21,6 +21,8 @@ Each record captures one significant design decision: the context, what we chose
 | [0015](0015-streamable-http-auth.md) | Streamable HTTP MCP and optional bearer auth | Accepted |
 | [0016](0016-hosted-pack-llm.md) | Hosted pack scoring stays out of CI | Accepted |
 | [0017](0017-llamaindex-memory.md) | LlamaIndex chat memory is an adapter, not a second memory API | Accepted |
+| [0018](0018-studio.md) | Studio is a Next.js client over Memory | Accepted |
+| [0019](0019-studio-ops.md) | Studio ops chrome uses hashed keys and persisted provider names | Accepted |
 
 ## Template
 

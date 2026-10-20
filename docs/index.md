@@ -11,7 +11,8 @@ TenseMem stores raw messages as an append-only log and projects them into facts 
 - [Python API](api.md) — `Memory` and `AsyncMemory`
 - [CLI](cli.md) — inspect, history, explain, search, jobs, bench, longmem, locomo, latency, mcp, serve
 - [MCP](mcp.md) — stdio or Streamable HTTP tools for remember / recall / state / history / forget
-- [REST](server.md) — HTTP routes for add / context / state / history / forget
+- [REST](server.md) — HTTP routes for add / context / state / history / forget / inspect
+- [Studio](studio.md) — Next.js inspector: safe-to-act, playground, compare, echo
 - [LangGraph store](langgraph.md) — `put` / `search` over `add()` and `context()`
 - [LlamaIndex chat memory](llamaindex.md) — `put` / `get` over `add()` and `context()`
 - [TenseBench](tensebench.md) — safe-to-act-on metrics

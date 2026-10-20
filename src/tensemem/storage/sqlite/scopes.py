@@ -44,6 +44,31 @@ def get_scope_by_id(conn: sqlite3.Connection, scope_id: int) -> Scope | None:
     return _to_scope(row, key, self_entity_id)
 
 
+def list_scopes(conn: sqlite3.Connection, *, namespace: str | None = None) -> tuple[Scope, ...]:
+    """Return stored scopes, optionally limited to one namespace."""
+    sql = """
+        SELECT id, user_id, agent_id, namespace, applied_seq, projection_version
+        FROM scopes
+    """
+    params: tuple[object, ...] = ()
+    if namespace is not None:
+        sql += " WHERE namespace = ?"
+        params = (namespace,)
+    sql += " ORDER BY user_id, agent_id, namespace"
+    found: list[Scope] = []
+    for row in conn.execute(sql, params).fetchall():
+        self_entity_id = find_self_entity(conn, row["id"])
+        if self_entity_id is None:
+            continue
+        key = ScopeKey(
+            user_id=row["user_id"],
+            agent_id=row["agent_id"],
+            namespace=row["namespace"],
+        )
+        found.append(_to_scope(row, key, self_entity_id))
+    return tuple(found)
+
+
 def get_scope(conn: sqlite3.Connection, key: ScopeKey) -> Scope | None:
     """Return the scope for ``key`` without creating it (safe on read connections)."""
     row = conn.execute(

@@ -309,6 +309,8 @@ def _recall(
         user_id,
         query,
         max_tokens=_int(arguments, "max_tokens", 300),
+        include_history=_flag(arguments, "include_history"),
+        fence=_flag(arguments, "fence", default=True),
         agent_id=agent_id,
         namespace=namespace,
     )
@@ -317,6 +319,7 @@ def _recall(
         "facts_used": list(packed.facts_used),
         "token_count": packed.token_count,
         "freshness": _freshness(packed.freshness),
+        "debug": [item.model_dump(mode="json") for item in packed.debug],
     }
 
 
@@ -372,6 +375,15 @@ def _user(arguments: Mapping[str, object], default_user: str) -> str:
     if not user_id:
         raise ValueError("user_id is required")
     return user_id
+
+
+def _flag(arguments: Mapping[str, object], key: str, *, default: bool = False) -> bool:
+    raw = arguments.get(key, default)
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, str):
+        return raw.strip().casefold() in {"1", "true", "yes"}
+    return bool(raw)
 
 
 def _int(arguments: Mapping[str, object], key: str, default: int) -> int:
