@@ -13,6 +13,7 @@ TenseMem stores raw messages as an append-only log and projects them into facts 
 - [MCP](mcp.md) — stdio or Streamable HTTP tools for remember / recall / state / history / forget
 - [REST](server.md) — HTTP routes for add / context / state / history / forget
 - [LangGraph store](langgraph.md) — `put` / `search` over `add()` and `context()`
+- [LlamaIndex chat memory](llamaindex.md) — `put` / `get` over `add()` and `context()`
 - [TenseBench](tensebench.md) — safe-to-act-on metrics
 - [Long-session eval](longmem.md) — LongMemEval-shaped packs scored through `context()`
 - [LoCoMo eval](locomo.md) — LoCoMo-shaped conversations scored through `context()`

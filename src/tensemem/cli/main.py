@@ -118,10 +118,22 @@ def _parser() -> argparse.ArgumentParser:
 
     longmem = sub.add_parser("longmem", help="score a LongMemEval-shaped pack (no database)")
     longmem.add_argument("--path", type=Path, default=None, help="JSON array or JSONL")
+    longmem.add_argument(
+        "--llm",
+        default=None,
+        choices=["openai", "anthropic", "ollama", "litellm", "fake"],
+        help="hosted extractor (default: FakeExtractor; not used in CI)",
+    )
     longmem.set_defaults(handler=_cmd_longmem)
 
     locomo = sub.add_parser("locomo", help="score a LoCoMo-shaped pack (no database)")
     locomo.add_argument("--path", type=Path, default=None, help="JSON array or JSONL")
+    locomo.add_argument(
+        "--llm",
+        default=None,
+        choices=["openai", "anthropic", "ollama", "litellm", "fake"],
+        help="hosted extractor (default: FakeExtractor; not used in CI)",
+    )
     locomo.set_defaults(handler=_cmd_locomo)
 
     mcp_p = sub.add_parser("mcp", help="MCP server (needs tensemem[mcp])")
@@ -330,9 +342,10 @@ def _cmd_bench(args: argparse.Namespace) -> int:
 
 
 def _cmd_longmem(args: argparse.Namespace) -> int:
+    from tensemem.eval.hosted import provider_from_name
     from tensemem.eval.longmem import format_report, run_longmem
 
-    report = run_longmem(args.path)
+    report = run_longmem(args.path, llm=provider_from_name(args.llm))
     if args.json:
         print(json.dumps(report.model_dump(mode="json"), indent=2))
         return 0
@@ -341,9 +354,10 @@ def _cmd_longmem(args: argparse.Namespace) -> int:
 
 
 def _cmd_locomo(args: argparse.Namespace) -> int:
+    from tensemem.eval.hosted import provider_from_name
     from tensemem.eval.locomo import format_report, run_locomo
 
-    report = run_locomo(args.path)
+    report = run_locomo(args.path, llm=provider_from_name(args.llm))
     if args.json:
         print(json.dumps(report.model_dump(mode="json"), indent=2))
         return 0

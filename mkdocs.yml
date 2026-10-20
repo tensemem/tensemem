@@ -12,6 +12,7 @@ nav:
   - MCP: mcp.md
   - REST: server.md
   - LangGraph store: langgraph.md
+  - LlamaIndex chat memory: llamaindex.md
   - TenseBench: tensebench.md
   - Long-session eval: longmem.md
   - LoCoMo eval: locomo.md

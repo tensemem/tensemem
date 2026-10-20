@@ -86,6 +86,14 @@ def test_longmem_prints_category_metrics(capsys: pytest.CaptureFixture[str]) -> 
     assert "abstention" in payload
 
 
+def test_longmem_llm_fake_stays_offline(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["longmem", "--llm", "fake"]) == 0
+    assert "LongMemEval adapter" in capsys.readouterr().out
+    with pytest.raises(SystemExit) as exc:
+        main(["longmem", "--llm", "mystery"])
+    assert exc.value.code == 2
+
+
 def test_locomo_prints_category_metrics(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["locomo"]) == 0
     out = capsys.readouterr().out

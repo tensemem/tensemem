@@ -19,6 +19,7 @@ from tensemem.core.ontology import Ontology
 from tensemem.core.temporal import resolve_valid_time
 from tensemem.eval.tensebench import BenchPredicate, ScriptedOp
 from tensemem.memory import Memory
+from tensemem.providers.llm.base import LLMProvider
 from tensemem.providers.llm.fake import FakeExtractor
 
 QuestionType = Literal[
@@ -145,12 +146,12 @@ def default_items_path() -> Path:
     raise FileNotFoundError(msg)
 
 
-def run_longmem(path: Path | None = None) -> LongMemReport:
+def run_longmem(path: Path | None = None, *, llm: LLMProvider | None = None) -> LongMemReport:
     """Replay user turns and score ``context()`` against each gold answer."""
     items = load_items(path)
     acc = _Acc()
     for item in items:
-        _score(item, acc)
+        _score(item, acc, llm=llm)
     return acc.freeze()
 
 
@@ -169,13 +170,13 @@ def format_report(report: LongMemReport) -> str:
     return "\n".join(lines)
 
 
-def _score(item: LmeItem, acc: _Acc) -> None:
+def _score(item: LmeItem, acc: _Acc, *, llm: LLMProvider | None = None) -> None:
     scripts = _scripts(item)
     clock = FrozenClock(datetime(2026, 10, 18, 11, 0, 0, tzinfo=UTC))
     with Memory(
         ":memory:",
         clock=clock,
-        llm=FakeExtractor(scripts),
+        llm=llm if llm is not None else FakeExtractor(scripts),
         start_worker=False,
     ) as mem:
         mem.seed(_ontology(item))

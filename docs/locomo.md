@@ -5,9 +5,10 @@
 ```bash
 tensemem locomo
 python -m tensemem.eval locomo --path /absolute/path/locomo10.json
+tensemem locomo --path /absolute/path/locomo10.json --llm openai
 ```
 
-`--path` accepts the official JSON array or JSONL (one conversation per line). `--db` is unused; this command does not open a database.
+`--path` accepts the official JSON array or JSONL (one conversation per line). `--db` is unused; this command does not open a database. `--llm openai|anthropic|ollama|litellm` uses that extractor (needs the matching extra and its key). Omit `--llm` or pass `--llm fake` to keep `FakeExtractor`. CI never passes `--llm`.
 
 ## What is scored
 
@@ -27,6 +28,6 @@ Official category-5 `answer` text is a prose explanation. That sentence is not a
 
 The report is a substring check, not official LoCoMo F1. Full-sentence gold answers in a downloaded pack will usually miss. Categories missing from the file, and unscored adversarial rows, print as `n/a`.
 
-Official instances have no extract labels. The pilot adds optional `ops` on turns so `FakeExtractor` can apply them; omitted `subject` uses the turn's `speaker`. A hosted-model run of the ten-conversation release is a later slice.
+Official instances have no extract labels. The pilot adds optional `ops` on turns so `FakeExtractor` can apply them; omitted `subject` uses the turn's `speaker`. A hosted extractor on a downloaded pack is `--llm` (ADR 0016).
 
 Session stamps (`9:00 am on 1 June, 2026`) keep their time. Stamps that do not parse are omitted (`occurred_at` stays unset) instead of sharing one fallback clock.

@@ -12,8 +12,8 @@ from tensemem.eval.tensebench import (
 
 def test_packaged_set_has_labeled_scenarios() -> None:
     cases = load_scenarios()
-    assert len(cases) == 82
-    assert len({case.id for case in cases}) == 82
+    assert len(cases) == 101
+    assert len({case.id for case in cases}) == 101
     assert {case.category for case in cases} >= {
         "relocation",
         "language",
@@ -37,7 +37,7 @@ def test_packaged_set_has_labeled_scenarios() -> None:
 def test_tensemem_meets_slo() -> None:
     report = run_suite()
     score = report.systems["tensemem"]
-    assert report.cases == 82
+    assert report.cases == 101
     assert score.current_state_accuracy is not None
     assert score.stale_fact_leak_rate is not None
     assert score.freshness_honesty is not None
@@ -58,7 +58,7 @@ def test_tensemem_meets_slo() -> None:
 
 def test_paragraph_cases_are_natural_multi_predicate() -> None:
     cases = [case for case in load_scenarios() if case.category == "paragraph"]
-    assert len(cases) == 12
+    assert len(cases) == 31
     banned = ("Delhi", "Bangalore", "I live in", "I write Python")
     for case in cases:
         assert len(case.predicates) >= 2

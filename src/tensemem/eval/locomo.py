@@ -20,6 +20,7 @@ from tensemem.core.temporal import resolve_valid_time
 from tensemem.eval.longmem import TypeScore
 from tensemem.eval.tensebench import BenchPredicate, ScriptedOp
 from tensemem.memory import Memory
+from tensemem.providers.llm.base import LLMProvider
 from tensemem.providers.llm.fake import FakeExtractor
 
 # Official evaluation.py IDs — not the paper's numbered list.
@@ -146,12 +147,12 @@ def default_samples_path() -> Path:
     raise FileNotFoundError(msg)
 
 
-def run_locomo(path: Path | None = None) -> LocomoReport:
+def run_locomo(path: Path | None = None, *, llm: LLMProvider | None = None) -> LocomoReport:
     """Replay both speakers and score ``context()`` against each gold answer."""
     samples = load_samples(path)
     acc = _Acc(conversations=len(samples))
     for sample in samples:
-        _score(sample, acc)
+        _score(sample, acc, llm=llm)
     return acc.freeze()
 
 
@@ -196,14 +197,14 @@ def session_stamp(raw: str) -> str | None:
     return resolved.valid_from
 
 
-def _score(sample: LocomoSample, acc: _Acc) -> None:
+def _score(sample: LocomoSample, acc: _Acc, *, llm: LLMProvider | None = None) -> None:
     sessions = _iter_sessions(sample.conversation)
     scripts = _scripts(sessions)
     clock = FrozenClock(datetime(2026, 10, 18, 11, 0, 0, tzinfo=UTC))
     with Memory(
         ":memory:",
         clock=clock,
-        llm=FakeExtractor(scripts),
+        llm=llm if llm is not None else FakeExtractor(scripts),
         start_worker=False,
     ) as mem:
         mem.seed(_ontology(sample, sessions))

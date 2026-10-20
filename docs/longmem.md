@@ -5,9 +5,10 @@
 ```bash
 tensemem longmem
 python -m tensemem.eval longmem --path /absolute/path/longmemeval_s.json
+tensemem longmem --path /absolute/path/longmemeval_s.json --llm openai
 ```
 
-`--path` accepts the official JSON array or JSONL (one instance per line). `--db` is unused; this command does not open a database.
+`--path` accepts the official JSON array or JSONL (one instance per line). `--db` is unused; this command does not open a database. `--llm openai|anthropic|ollama|litellm` uses that extractor (needs the matching extra and its key). Omit `--llm` or pass `--llm fake` to keep `FakeExtractor`. CI never passes `--llm`.
 
 ## What is scored
 
@@ -22,6 +23,6 @@ Official `_abs` items put a prose explanation in `answer`. That sentence is not 
 
 The report is a substring check, not official LongMemEval accuracy. Full-sentence gold answers in a downloaded pack will usually miss. Types missing from the file, and unscored abstention, print as `n/a`.
 
-Official instances have no extract labels. The pilot adds optional `ops` on user turns so `FakeExtractor` can apply them. A hosted-model run of the full pack is a later slice.
+Official instances have no extract labels. The pilot adds optional `ops` on user turns so `FakeExtractor` can apply them. A hosted extractor on a downloaded pack is `--llm` (ADR 0016).
 
 Session dates (`YYYY/MM/DD [(Mon)] [HH:MM]`) keep their time. Stamps that do not parse are omitted (`occurred_at` stays unset) instead of sharing one fallback clock.

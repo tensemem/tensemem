@@ -74,8 +74,15 @@ def _longmem(argv: list[str]) -> None:
 
     parser = argparse.ArgumentParser(description="Score a LongMemEval-shaped pack.")
     parser.add_argument("--path", type=Path, default=None)
+    parser.add_argument(
+        "--llm",
+        default=None,
+        choices=["openai", "anthropic", "ollama", "litellm", "fake"],
+    )
     args = parser.parse_args(argv)
-    print(format_longmem(run_longmem(args.path)))
+    from tensemem.eval.hosted import provider_from_name
+
+    print(format_longmem(run_longmem(args.path, llm=provider_from_name(args.llm))))
 
 
 def _locomo(argv: list[str]) -> None:
@@ -84,8 +91,15 @@ def _locomo(argv: list[str]) -> None:
 
     parser = argparse.ArgumentParser(description="Score a LoCoMo-shaped pack.")
     parser.add_argument("--path", type=Path, default=None)
+    parser.add_argument(
+        "--llm",
+        default=None,
+        choices=["openai", "anthropic", "ollama", "litellm", "fake"],
+    )
     args = parser.parse_args(argv)
-    print(format_locomo(run_locomo(args.path)))
+    from tensemem.eval.hosted import provider_from_name
+
+    print(format_locomo(run_locomo(args.path, llm=provider_from_name(args.llm))))
 
 
 if __name__ == "__main__":
