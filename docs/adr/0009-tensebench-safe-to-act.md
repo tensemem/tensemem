@@ -25,7 +25,7 @@ A large hosted-model suite is out of reach for this slice: CI must stay determin
 
 ## Consequences
 
-- A passing CI run means the engine, guard, and resolver behave on the pilot set, not that a hosted extractor is production-ready.
+- A passing CI run means the engine, guard, and resolver behave on the packaged set, not that a hosted extractor is production-ready.
 - Scripted ops can hide extract mistakes; those remain the golden set's job.
 - Growing to hundreds of scenarios should keep the same metric definitions so old numbers stay comparable.
 

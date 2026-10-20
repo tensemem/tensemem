@@ -26,7 +26,7 @@ tensemem serve
 
 Global flags: `--db path.db`, `--json`, `--agent`, `--namespace`.
 
-`tensemem bench` does not open a database. It scores the packaged TenseBench pilot (override with `--path`) against TenseMem, concatenated history, and token-overlap retrieval. See [TenseBench](tensebench.md).
+`tensemem bench` does not open a database. It scores the packaged TenseBench set (override with `--path`) against TenseMem, concatenated history, and token-overlap retrieval. See [TenseBench](tensebench.md).
 
 `tensemem latency` also skips the database file. It seeds ACTIVE facts in memory and times empty-query `context()`. See [Context latency](latency.md).
 

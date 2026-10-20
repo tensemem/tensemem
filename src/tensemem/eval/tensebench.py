@@ -1,4 +1,4 @@
-"""TenseBench pilot: score whether memory is safe to act on (design §17.4)."""
+"""TenseBench: score whether memory is safe to act on (design §17.4)."""
 
 from __future__ import annotations
 
@@ -44,6 +44,7 @@ class ScriptedOp(BaseModel):
     object: str
     op: OpKind = OpKind.SET
     evidence: str = ""
+    valid_from: str | None = None
 
 
 class BenchTurn(BaseModel):
@@ -163,7 +164,7 @@ class BenchReport(BaseModel):
 
 
 def load_scenarios(path: Path | None = None) -> tuple[Scenario, ...]:
-    """Read JSONL scenarios. ``path`` defaults to the packaged pilot set."""
+    """Read JSONL scenarios. ``path`` defaults to the packaged v1 set."""
     text = path.read_text(encoding="utf-8") if path is not None else _packaged_text()
     rows: list[Scenario] = []
     for line in text.splitlines():
@@ -173,7 +174,7 @@ def load_scenarios(path: Path | None = None) -> tuple[Scenario, ...]:
 
 
 def default_scenarios_path() -> Path:
-    """Filesystem path to the packaged pilot JSONL when it is not inside a zip."""
+    """Filesystem path to the packaged JSONL when it is not inside a zip."""
     resource = files("tensemem.eval").joinpath(_PACKAGED)
     if isinstance(resource, Path) and resource.is_file():
         return resource
@@ -344,6 +345,7 @@ def _ops_for(turn: BenchTurn) -> tuple[ExtractedOp, ...]:
             object=item.object,
             op=item.op,
             evidence=item.evidence or turn.text,
+            valid_from=item.valid_from,
         )
         for item in turn.ops
     )

@@ -2,7 +2,7 @@
 
 TenseBench scores whether recalled memory is **safe to act on**. Extraction precision lives in the [golden set](golden.md) (`python -m tensemem.eval`). This harness asks a different question: after state changes, does the system still present an outdated fact as if it were current?
 
-The pilot (`src/tensemem/eval/tensebench_v1.jsonl`, shipped in the package) is 30 hand-written conversations. CI runs it with `FakeExtractor` so the numbers are deterministic. A later slice grows the set and adds hosted-model runs.
+The packaged set (`src/tensemem/eval/tensebench_v1.jsonl`) is 70 hand-written conversations. CI runs it with `FakeExtractor` so the numbers are deterministic. Hosted-model runs stay a later slice.
 
 ```bash
 tensemem bench
@@ -11,7 +11,7 @@ python -m tensemem.eval bench
 
 ## Metrics
 
-| Metric | What it counts | Pilot target |
+| Metric | What it counts | Target |
 |---|---|---|
 | Current-state accuracy | Expected ACTIVE triples match exactly | ≥ 0.95 |
 | Stale-fact leak rate | Outdated values presented as current (ACTIVE facts, or current-fact bullets). Labeled `(previously …)` text and episode snippets do not count. | 0 |
@@ -31,4 +31,4 @@ Do not treat concat or similarity as competing products; they exist so the leak 
 
 ## Adding a scenario
 
-One JSON object per line in `src/tensemem/eval/tensebench_v1.jsonl`. Rule-based `FakeExtractor` handles `I live in …`, `I moved to …`, `I write …`, and `I now only write …`. Other utterances set `"ops"` (including `"ops": []` when the extractor must stay silent). Entity aliases go in `"entities"`.
+One JSON object per line in `src/tensemem/eval/tensebench_v1.jsonl`. Rule-based `FakeExtractor` handles `I live in …`, `I moved to …`, `I write …`, `I now only write …`, `I work at …`, and diet lines. Other utterances set `"ops"` (including `"ops": []` when the extractor must stay silent). Late backfills set `"valid_from"` on both the current fact and the older one. An undated current fact has unknown precision, so the resolver treats a dated backfill as newer. Entity aliases go in `"entities"`.
