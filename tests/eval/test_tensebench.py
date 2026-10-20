@@ -10,10 +10,10 @@ from tensemem.eval.tensebench import (
 )
 
 
-def test_packaged_set_has_seventy_labeled_scenarios() -> None:
+def test_packaged_set_has_labeled_scenarios() -> None:
     cases = load_scenarios()
-    assert len(cases) == 70
-    assert len({case.id for case in cases}) == 70
+    assert len(cases) == 82
+    assert len({case.id for case in cases}) == 82
     assert {case.category for case in cases} >= {
         "relocation",
         "language",
@@ -25,6 +25,7 @@ def test_packaged_set_has_seventy_labeled_scenarios() -> None:
         "echo",
         "freshness",
         "history",
+        "paragraph",
     }
     packed = files("tensemem.eval").joinpath("tensebench_v1.jsonl")
     assert packed.is_file()
@@ -36,7 +37,7 @@ def test_packaged_set_has_seventy_labeled_scenarios() -> None:
 def test_tensemem_meets_slo() -> None:
     report = run_suite()
     score = report.systems["tensemem"]
-    assert report.cases == 70
+    assert report.cases == 82
     assert score.current_state_accuracy is not None
     assert score.stale_fact_leak_rate is not None
     assert score.freshness_honesty is not None
@@ -53,6 +54,18 @@ def test_tensemem_meets_slo() -> None:
     assert score.echo_n >= 5
     assert score.durable_n >= 5
     assert score.leak_n >= 20
+
+
+def test_paragraph_cases_are_natural_multi_predicate() -> None:
+    cases = [case for case in load_scenarios() if case.category == "paragraph"]
+    assert len(cases) == 12
+    banned = ("Delhi", "Bangalore", "I live in", "I write Python")
+    for case in cases:
+        assert len(case.predicates) >= 2
+        blob = " ".join(turn.text for turn in case.turns)
+        assert all(token not in blob for token in banned)
+        assert all(len(turn.text) >= 60 for turn in case.turns)
+        assert all(turn.ops is not None for turn in case.turns)
 
 
 def test_concat_leaks_stale_cities() -> None:
