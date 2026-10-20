@@ -5,11 +5,13 @@
 ```bash
 pip install "tensemem[server]"
 tensemem --db /absolute/path/tensemem.db serve --port 8080
+export TENSEMEM_TOKEN=replace-me
+tensemem --db /absolute/path/tensemem.db serve --port 8080 --token "$TENSEMEM_TOKEN"
 ```
 
 Default bind is `127.0.0.1:8080`. `--db`, `--agent`, and `--namespace` are root flags (before `serve`).
 
-This process has no authentication and does not configure TLS. Keep it on loopback. If `--host` exposes it beyond loopback, put a TLS-terminating reverse proxy in front that authenticates callers and authorizes the `user_id` they send.
+When `--token` or `TENSEMEM_TOKEN` is set, every route except `GET /health` needs `Authorization: Bearer <token>`. This process does not configure TLS. Keep it on loopback. If `--host` exposes it beyond loopback, put a TLS-terminating reverse proxy in front that also authorizes the `user_id` callers send.
 
 ## Routes
 

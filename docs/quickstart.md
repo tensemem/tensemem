@@ -38,7 +38,7 @@ pip install "tensemem[mcp]"
 tensemem --db /absolute/path/tensemem.db mcp --user u1
 ```
 
-See [MCP](mcp.md) for the tool list and host config.
+See [MCP](mcp.md) for stdio, Streamable HTTP (`--http`), and the tool list.
 
 HTTP on the same file:
 

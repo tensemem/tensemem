@@ -1,10 +1,11 @@
 # MCP
 
-`tensemem mcp` exposes the engine on stdio so an MCP host can remember and recall without embedding Python. Same SQLite file as the [CLI](cli.md). Needs `tensemem[mcp]`.
+`tensemem mcp` exposes the engine so an MCP host can remember and recall without embedding Python. Same SQLite file as the [CLI](cli.md). Needs `tensemem[mcp]`. Default transport is stdio. `--http` is Streamable HTTP.
 
 ```bash
 pip install "tensemem[mcp]"
 tensemem --db /absolute/path/tensemem.db mcp --user u1
+tensemem --db /absolute/path/tensemem.db mcp --http --port 8081
 ```
 
 Host config (stdio):
@@ -22,6 +23,20 @@ Host config (stdio):
 
 `--db`, `--agent`, and `--namespace` are root flags (before `mcp`). `--user` is the default `user_id` when a tool omits it.
 
+Host config (Streamable HTTP):
+
+```json
+{
+  "mcpServers": {
+    "tensemem": {
+      "url": "http://127.0.0.1:8081/mcp"
+    }
+  }
+}
+```
+
+`--http` default bind is `127.0.0.1:8081`. Pass `--token` or `TENSEMEM_TOKEN` and send `Authorization: Bearer <token>`. This process does not terminate TLS. Keep it on loopback, or put a TLS proxy in front.
+
 A fresh file is seeded with the FakeExtractor predicates (`lives_in`, `uses_language`, and the rest of that set) so `remember` can extract without a Python app calling `register_predicate` first. Re-opening the file is a no-op for those names.
 
 ## Tools
@@ -36,4 +51,4 @@ A fresh file is seeded with the FakeExtractor predicates (`lives_in`, `uses_lang
 
 Reads include freshness (`as_of_seq`, `pending`, `is_current`). Recalled text is fenced so a later `remember` of the same conversation does not learn from the model's own echo.
 
-This process does not start REST. For HTTP, see [REST](server.md). For a second process on the same file, see [Operations](ops.md).
+This process does not start REST. For JSON HTTP, see [REST](server.md). For a second process on the same file, see [Operations](ops.md).

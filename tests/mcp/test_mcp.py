@@ -5,7 +5,7 @@ import pytest
 
 from tensemem import FakeExtractor, Memory
 from tensemem.core.models import JobStatus
-from tensemem.mcp import TOOL_NAMES, bind_server, call_tool, seed_starter, serve
+from tensemem.mcp import TOOL_NAMES, bind_http_app, bind_server, call_tool, seed_starter, serve
 
 
 def test_remember_recall_state_history_forget() -> None:
@@ -87,6 +87,8 @@ def test_bind_server_needs_extra(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(mcp_mod.importlib, "import_module", missing)
     with Memory(":memory:") as mem, pytest.raises(RuntimeError, match=r"tensemem\[mcp\]"):
         bind_server(mem)
+    with Memory(":memory:") as mem, pytest.raises(RuntimeError, match=r"tensemem\[mcp\]"):
+        bind_http_app(mem)
 
 
 def test_serve_opens_database(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -148,3 +150,39 @@ def test_serve_leaves_existing_jobs_queued(tmp_path: Path, monkeypatch: pytest.M
     with Memory(db, start_worker=False) as mem:
         assert mem.jobs("u1")[0].status is JobStatus.QUEUED
         assert mem.state("u2").values == {"lives_in": "Pune"}
+
+
+def test_serve_http_uses_streamable_transport(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    seen: dict[str, object] = {}
+
+    def fake_http(
+        mem: Memory,
+        *,
+        host: str,
+        port: int,
+        default_user: str = "",
+        agent_id: str = "",
+        namespace: str = "default",
+        token: str | None = None,
+    ) -> None:
+        del mem
+        seen["host"] = host
+        seen["port"] = port
+        seen["user"] = default_user
+        seen["token"] = token
+
+    monkeypatch.setattr("tensemem.mcp.run_http", fake_http)
+    db = tmp_path / "mcp-http.db"
+    serve(db, default_user="u1", http=True, host="0.0.0.0", port=8081, token="secret")
+    assert db.exists()
+    assert seen == {
+        "host": "0.0.0.0",
+        "port": 8081,
+        "user": "u1",
+        "token": "secret",
+    }
+    assert "TLS is off" in capsys.readouterr().err
+    with pytest.raises(ValueError, match="port"):
+        serve(tmp_path / "bad.db", http=True, port=0)

@@ -11,6 +11,7 @@ nav:
   - CLI: cli.md
   - MCP: mcp.md
   - REST: server.md
+  - LangGraph store: langgraph.md
   - TenseBench: tensebench.md
   - Long-session eval: longmem.md
   - LoCoMo eval: locomo.md

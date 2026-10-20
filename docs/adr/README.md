@@ -17,6 +17,8 @@ Each record captures one significant design decision: the context, what we chose
 | [0011](0011-rest-serve.md) | REST is an HTTP adapter over the same engine | Accepted |
 | [0012](0012-longmem-adapter.md) | Long-session packs reuse the engine, not a second memory API | Accepted |
 | [0013](0013-locomo-adapter.md) | LoCoMo packs reuse the same context() scorer | Accepted |
+| [0014](0014-langgraph-store.md) | The LangGraph store is an adapter, not a second memory API | Accepted |
+| [0015](0015-streamable-http-auth.md) | Streamable HTTP MCP and optional bearer auth | Accepted |
 
 ## Template
 

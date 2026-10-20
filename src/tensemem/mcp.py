@@ -1,17 +1,22 @@
-"""Stdio MCP server: remember, recall, state, history, forget (ADR 0010)."""
+"""MCP server: stdio or Streamable HTTP (ADR 0010 / 0015)."""
 
 from __future__ import annotations
 
 import importlib
 import json
+import sys
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Final
 
+from tensemem.auth import bind_warning, wrap_bearer
 from tensemem.core.models import Cardinality, Freshness, PredicateSpec
 from tensemem.core.ontology import Ontology
 from tensemem.memory import Memory
 from tensemem.providers.llm.fake import FakeExtractor
+
+_DEFAULT_HTTP_HOST = "127.0.0.1"
+_DEFAULT_HTTP_PORT = 8081
 
 TOOL_NAMES: Final[tuple[str, ...]] = (
     "remember",
@@ -82,14 +87,35 @@ def serve(
     default_user: str = "",
     agent_id: str = "",
     namespace: str = "default",
+    http: bool = False,
+    host: str = _DEFAULT_HTTP_HOST,
+    port: int = _DEFAULT_HTTP_PORT,
+    token: str | None = None,
 ) -> None:
-    """Open ``path`` and serve the five tools on stdio until the host exits.
+    """Open ``path`` and serve the five tools until the host exits.
 
+    Default transport is stdio. ``http=True`` is Streamable HTTP on ``host:port``.
     The extract worker stays off so queued jobs from another process are not
     claimed by ``FakeExtractor``. ``remember`` still waits in the tool call.
     """
+    if http and (port < 1 or port > 65535):
+        raise ValueError("port must be between 1 and 65535")
+    warning = bind_warning(host, token) if http else None
+    if warning:
+        print(f"tensemem mcp --http: {warning}", file=sys.stderr)
     with Memory(path, llm=FakeExtractor(), start_worker=False) as mem:
         seed_starter(mem)
+        if http:
+            run_http(
+                mem,
+                host=host,
+                port=port,
+                default_user=default_user,
+                agent_id=agent_id,
+                namespace=namespace,
+                token=token,
+            )
+            return
         run_stdio(mem, default_user=default_user, agent_id=agent_id, namespace=namespace)
 
 
@@ -109,15 +135,65 @@ def run_stdio(
     app.run()
 
 
+def run_http(
+    mem: Memory,
+    *,
+    host: str,
+    port: int,
+    default_user: str = "",
+    agent_id: str = "",
+    namespace: str = "default",
+    token: str | None = None,
+) -> None:
+    uvicorn = _load_uvicorn()
+    app = bind_http_app(
+        mem,
+        host=host,
+        port=port,
+        default_user=default_user,
+        agent_id=agent_id,
+        namespace=namespace,
+        token=token,
+    )
+    uvicorn(app, host=host, port=port)
+
+
+def bind_http_app(
+    mem: Memory,
+    *,
+    host: str = _DEFAULT_HTTP_HOST,
+    port: int = _DEFAULT_HTTP_PORT,
+    default_user: str = "",
+    agent_id: str = "",
+    namespace: str = "default",
+    token: str | None = None,
+) -> Any:
+    """Streamable HTTP ASGI app. Optional bearer wrap; SDK import stays here."""
+    server = bind_server(
+        mem,
+        default_user=default_user,
+        agent_id=agent_id,
+        namespace=namespace,
+        host=host,
+        port=port,
+    )
+    builder = getattr(server, "streamable_http_app", None)
+    if builder is None:
+        raise RuntimeError(_MISSING_EXTRA)
+    return wrap_bearer(builder(), token)
+
+
 def bind_server(
     mem: Memory,
     *,
     default_user: str = "",
     agent_id: str = "",
     namespace: str = "default",
+    host: str = _DEFAULT_HTTP_HOST,
+    port: int = _DEFAULT_HTTP_PORT,
 ) -> Any:
     """Register tools on an SDK server. Import happens here so the extra stays optional."""
-    app = _new_server()
+    app = _new_server(host=host, port=port)
 
     def invoke(name: str, arguments: Mapping[str, object]) -> str:
         return call_tool(
@@ -160,7 +236,7 @@ def bind_server(
     return app
 
 
-def _new_server() -> Any:
+def _new_server(*, host: str = _DEFAULT_HTTP_HOST, port: int = _DEFAULT_HTTP_PORT) -> Any:
     for module_name, class_name in (
         ("mcp.server.fastmcp", "FastMCP"),
         ("mcp.server", "MCPServer"),
@@ -170,9 +246,24 @@ def _new_server() -> Any:
         except ImportError:
             continue
         cls = getattr(module, class_name, None)
-        if cls is not None:
+        if cls is None:
+            continue
+        try:
+            return cls("tensemem", host=host, port=port)
+        except TypeError:
             return cls("tensemem")
     raise RuntimeError(_MISSING_EXTRA)
+
+
+def _load_uvicorn() -> Any:
+    try:
+        module = importlib.import_module("uvicorn")
+    except ImportError as exc:
+        raise RuntimeError(_MISSING_EXTRA) from exc
+    run = getattr(module, "run", None)
+    if run is None:
+        raise RuntimeError(_MISSING_EXTRA)
+    return run
 
 
 def _remember(

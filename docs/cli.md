@@ -23,7 +23,8 @@ tensemem longmem
 tensemem locomo
 tensemem latency
 tensemem mcp --user u1
-tensemem serve
+tensemem mcp --http --token "$TENSEMEM_TOKEN"
+tensemem serve --token "$TENSEMEM_TOKEN"
 ```
 
 Global flags: `--db path.db`, `--json`, `--agent`, `--namespace`.
@@ -36,8 +37,8 @@ Global flags: `--db path.db`, `--json`, `--agent`, `--namespace`.
 
 `tensemem latency` also skips the database file. It seeds ACTIVE facts in memory and times empty-query `context()`. See [Context latency](latency.md).
 
-`tensemem mcp` creates the SQLite file if missing and serves five tools on stdio (`remember`, `recall_context`, `get_state`, `get_history`, `forget`). `--db` is a root flag (`tensemem --db path.db mcp --user u1`). Needs `tensemem[mcp]`. See [MCP](mcp.md).
+`tensemem mcp` creates the SQLite file if missing and serves five tools on stdio (`remember`, `recall_context`, `get_state`, `get_history`, `forget`). `--http` is Streamable HTTP on `127.0.0.1:8081`. `--token` or `TENSEMEM_TOKEN` is a Bearer token for `--http`. `--db` is a root flag (`tensemem --db path.db mcp --user u1`). Needs `tensemem[mcp]`. See [MCP](mcp.md).
 
-`tensemem serve` is the HTTP adapter for those same five operations (`tensemem --db path.db serve --port 8080`). Default bind is loopback; the process has no auth or TLS. Needs `tensemem[server]`. See [REST](server.md).
+`tensemem serve` is the HTTP adapter for those same five operations (`tensemem --db path.db serve --port 8080`). Default bind is loopback. `--token` or `TENSEMEM_TOKEN` requires `Authorization: Bearer`. TLS stays in a proxy. Needs `tensemem[server]`. See [REST](server.md).
 
 `rebuild` from the CLI replays explicit ops and re-queues messages. Re-extract those messages from Python with `Memory(..., llm=...).rebuild(user_id, wait=True)`.

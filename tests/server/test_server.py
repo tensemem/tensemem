@@ -113,8 +113,9 @@ def test_serve_leaves_existing_jobs_queued(tmp_path: Path, monkeypatch: pytest.M
         port: int,
         agent_id: str = "",
         namespace: str = "default",
+        token: str | None = None,
     ) -> None:
-        del mem, host, port, agent_id, namespace
+        del mem, host, port, agent_id, namespace, token
         seen["ran"] = True
 
     monkeypatch.setattr("tensemem.server.run_http", fake_http)
@@ -149,12 +150,15 @@ def test_serve_warns_when_host_is_not_loopback(
         port: int,
         agent_id: str = "",
         namespace: str = "default",
+        token: str | None = None,
     ) -> None:
-        del mem, host, port, agent_id, namespace
+        del mem, host, port, agent_id, namespace, token
 
     monkeypatch.setattr("tensemem.server.run_http", fake_http)
     serve(tmp_path / "t.db", host="0.0.0.0", port=8080)
     assert "no auth or TLS" in capsys.readouterr().err
+    serve(tmp_path / "tok.db", host="0.0.0.0", port=8080, token="secret")
+    assert "TLS is off" in capsys.readouterr().err
     serve(tmp_path / "loop.db", host="127.0.0.1", port=8080)
     assert capsys.readouterr().err == ""
 

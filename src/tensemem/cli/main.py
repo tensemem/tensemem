@@ -124,8 +124,20 @@ def _parser() -> argparse.ArgumentParser:
     locomo.add_argument("--path", type=Path, default=None, help="JSON array or JSONL")
     locomo.set_defaults(handler=_cmd_locomo)
 
-    mcp_p = sub.add_parser("mcp", help="stdio MCP server (needs tensemem[mcp])")
+    mcp_p = sub.add_parser("mcp", help="MCP server (needs tensemem[mcp])")
     mcp_p.add_argument("--user", default="", help="default user_id when a tool omits it")
+    mcp_p.add_argument(
+        "--http",
+        action="store_true",
+        help="Streamable HTTP instead of stdio (default 127.0.0.1:8081)",
+    )
+    mcp_p.add_argument("--host", default="127.0.0.1", help="bind address for --http")
+    mcp_p.add_argument("--port", type=int, default=8081, help="bind port for --http")
+    mcp_p.add_argument(
+        "--token",
+        default=None,
+        help="Bearer token for --http (or TENSEMEM_TOKEN)",
+    )
     mcp_p.set_defaults(handler=_cmd_mcp)
 
     serve_p = sub.add_parser("serve", help="REST server (needs tensemem[server])")
@@ -135,6 +147,11 @@ def _parser() -> argparse.ArgumentParser:
         help="bind address (default 127.0.0.1; non-loopback needs a TLS proxy)",
     )
     serve_p.add_argument("--port", type=int, default=8080)
+    serve_p.add_argument(
+        "--token",
+        default=None,
+        help="Bearer token (or TENSEMEM_TOKEN)",
+    )
     serve_p.set_defaults(handler=_cmd_serve)
 
     latency = sub.add_parser("latency", help="time empty-query context() (no database required)")
@@ -335,6 +352,7 @@ def _cmd_locomo(args: argparse.Namespace) -> int:
 
 
 def _cmd_serve(args: argparse.Namespace) -> int:
+    from tensemem.auth import resolve_token
     from tensemem.server import serve
 
     try:
@@ -344,6 +362,7 @@ def _cmd_serve(args: argparse.Namespace) -> int:
             port=args.port,
             agent_id=args.agent_id,
             namespace=args.namespace,
+            token=resolve_token(args.token),
         )
     except RuntimeError as extra:
         print(extra, file=sys.stderr)
@@ -352,6 +371,7 @@ def _cmd_serve(args: argparse.Namespace) -> int:
 
 
 def _cmd_mcp(args: argparse.Namespace) -> int:
+    from tensemem.auth import resolve_token
     from tensemem.mcp import serve
 
     try:
@@ -360,6 +380,10 @@ def _cmd_mcp(args: argparse.Namespace) -> int:
             default_user=args.user,
             agent_id=args.agent_id,
             namespace=args.namespace,
+            http=args.http,
+            host=args.host,
+            port=args.port,
+            token=resolve_token(args.token),
         )
     except RuntimeError as extra:
         print(extra, file=sys.stderr)

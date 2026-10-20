@@ -10,6 +10,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, Final, cast
 
+from tensemem.auth import bind_warning, require_auth
 from tensemem.mcp import call_tool, seed_starter
 from tensemem.memory import Memory
 from tensemem.providers.llm.fake import FakeExtractor
@@ -18,8 +19,6 @@ _MISSING_EXTRA = "tensemem serve needs tensemem[server]"
 _DEFAULT_HOST = "127.0.0.1"
 _DEFAULT_PORT = 8080
 MAX_BODY_BYTES = 65_536
-_LOOPBACK = frozenset({"127.0.0.1", "::1", "localhost"})
-
 ROUTES: Final[tuple[tuple[str, str], ...]] = (
     ("POST", "/v1/memories:add"),
     ("POST", "/v1/context"),
@@ -79,6 +78,7 @@ def serve(
     port: int = _DEFAULT_PORT,
     agent_id: str = "",
     namespace: str = "default",
+    token: str | None = None,
 ) -> None:
     """Open ``path`` and serve the five routes until the process exits.
 
@@ -87,15 +87,19 @@ def serve(
     """
     if port < 1 or port > 65535:
         raise ValueError("port must be between 1 and 65535")
-    if not _is_loopback(host):
-        print(
-            "tensemem serve has no auth or TLS; bind loopback or put a "
-            "TLS-terminating, user-scoped proxy in front",
-            file=sys.stderr,
-        )
+    warning = bind_warning(host, token)
+    if warning:
+        print(f"tensemem serve: {warning}", file=sys.stderr)
     with Memory(path, llm=FakeExtractor(), start_worker=False) as mem:
         seed_starter(mem)
-        run_http(mem, host=host, port=port, agent_id=agent_id, namespace=namespace)
+        run_http(
+            mem,
+            host=host,
+            port=port,
+            agent_id=agent_id,
+            namespace=namespace,
+            token=token,
+        )
 
 
 def create_app(
@@ -103,6 +107,7 @@ def create_app(
     *,
     agent_id: str = "",
     namespace: str = "default",
+    token: str | None = None,
 ) -> Any:
     """Build a FastAPI app. Import happens here so the extra stays optional."""
     fastapi = _load("fastapi", "FastAPI")
@@ -110,6 +115,9 @@ def create_app(
     app = fastapi(title="TenseMem", version="0.0.1")
 
     async def handle(request: Any) -> Any:
+        authorization = request.headers.get("authorization")
+        if not require_auth(request.method, request.url.path, authorization, token):
+            return json_response({"error": "unauthorized"}, status_code=401)
         body: Mapping[str, object] = {}
         if request.method in {"POST", "PUT", "PATCH"}:
             chunks: list[bytes] = []
@@ -155,10 +163,11 @@ def run_http(
     port: int,
     agent_id: str = "",
     namespace: str = "default",
+    token: str | None = None,
 ) -> None:
     uvicorn = _load("uvicorn", "run")
     uvicorn(
-        create_app(mem, agent_id=agent_id, namespace=namespace),
+        create_app(mem, agent_id=agent_id, namespace=namespace, token=token),
         host=host,
         port=port,
     )
@@ -192,10 +201,6 @@ def limited_body(
             raise ValueError("request body too large")
         parts.append(chunk)
     return b"".join(parts)
-
-
-def _is_loopback(host: str) -> bool:
-    return host.strip().casefold() in _LOOPBACK
 
 
 def _scope_user(method: str, path: str) -> str | None:

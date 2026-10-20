@@ -112,6 +112,7 @@ def test_bench_prints_pilot_metrics(capsys: pytest.CaptureFixture[str]) -> None:
 def test_mcp_cli_creates_db_and_reports_missing_extra(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.delenv("TENSEMEM_TOKEN", raising=False)
     db = tmp_path / "mcp.db"
 
     def missing(*args: object, **kwargs: object) -> None:
@@ -123,11 +124,25 @@ def test_mcp_cli_creates_db_and_reports_missing_extra(
 
     seen: dict[str, object] = {}
 
-    def fake_serve(path: str, *, default_user: str, agent_id: str, namespace: str) -> None:
+    def fake_serve(
+        path: str,
+        *,
+        default_user: str,
+        agent_id: str,
+        namespace: str,
+        http: bool = False,
+        host: str = "127.0.0.1",
+        port: int = 8081,
+        token: str | None = None,
+    ) -> None:
         seen["path"] = path
         seen["user"] = default_user
         seen["agent"] = agent_id
         seen["namespace"] = namespace
+        seen["http"] = http
+        seen["host"] = host
+        seen["port"] = port
+        seen["token"] = token
 
     monkeypatch.setattr("tensemem.mcp.serve", fake_serve)
     with pytest.raises(SystemExit) as raised:
@@ -139,12 +154,37 @@ def test_mcp_cli_creates_db_and_reports_missing_extra(
         "user": "u1",
         "agent": "a1",
         "namespace": "default",
+        "http": False,
+        "host": "127.0.0.1",
+        "port": 8081,
+        "token": None,
     }
+    assert (
+        main(
+            [
+                "--db",
+                str(db),
+                "mcp",
+                "--http",
+                "--host",
+                "127.0.0.1",
+                "--port",
+                "8092",
+                "--token",
+                "secret",
+            ]
+        )
+        == 0
+    )
+    assert seen["http"] is True
+    assert seen["port"] == 8092
+    assert seen["token"] == "secret"
 
 
 def test_serve_cli_reports_missing_extra_and_flag_order(
     tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    monkeypatch.delenv("TENSEMEM_TOKEN", raising=False)
     db = tmp_path / "rest.db"
 
     def missing(*args: object, **kwargs: object) -> None:
@@ -156,12 +196,21 @@ def test_serve_cli_reports_missing_extra_and_flag_order(
 
     seen: dict[str, object] = {}
 
-    def fake_serve(path: str, *, host: str, port: int, agent_id: str, namespace: str) -> None:
+    def fake_serve(
+        path: str,
+        *,
+        host: str,
+        port: int,
+        agent_id: str,
+        namespace: str,
+        token: str | None = None,
+    ) -> None:
         seen["path"] = path
         seen["host"] = host
         seen["port"] = port
         seen["agent"] = agent_id
         seen["namespace"] = namespace
+        seen["token"] = token
 
     monkeypatch.setattr("tensemem.server.serve", fake_serve)
     with pytest.raises(SystemExit) as raised:
@@ -174,7 +223,10 @@ def test_serve_cli_reports_missing_extra_and_flag_order(
         "port": 8091,
         "agent": "",
         "namespace": "default",
+        "token": None,
     }
+    assert main(["--db", str(db), "serve", "--token", "secret"]) == 0
+    assert seen["token"] == "secret"
 
 
 def test_latency_prints_percentiles(capsys: pytest.CaptureFixture[str]) -> None:

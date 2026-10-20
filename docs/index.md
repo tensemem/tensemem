@@ -10,8 +10,9 @@ TenseMem stores raw messages as an append-only log and projects them into facts 
 - [Concepts](concepts.md) — episodes, facts, freshness, fences, corrections
 - [Python API](api.md) — `Memory` and `AsyncMemory`
 - [CLI](cli.md) — inspect, history, explain, search, jobs, bench, longmem, locomo, latency, mcp, serve
-- [MCP](mcp.md) — stdio tools for remember / recall / state / history / forget
+- [MCP](mcp.md) — stdio or Streamable HTTP tools for remember / recall / state / history / forget
 - [REST](server.md) — HTTP routes for add / context / state / history / forget
+- [LangGraph store](langgraph.md) — `put` / `search` over `add()` and `context()`
 - [TenseBench](tensebench.md) — safe-to-act-on metrics
 - [Long-session eval](longmem.md) — LongMemEval-shaped packs scored through `context()`
 - [LoCoMo eval](locomo.md) — LoCoMo-shaped conversations scored through `context()`
