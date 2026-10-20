@@ -15,11 +15,13 @@ User turns are replayed with `add(..., wait=True)`. Assistant turns are stored i
 
 | Bucket | Pass when |
 |---|---|
-| The six published `question_type` values | The gold `answer` appears in `context().text` |
-| Abstention (`question_id` ends in `_abs`) | The gold `answer` is **absent** from the current-fact section |
+| The six published `question_type` values | The gold `answer` appears as a substring in `context().text` |
+| Abstention (`question_id` ends in `_abs`) | Optional `abstain_trap` is **absent** from the current-fact section |
 
-The report prints accuracy overall, per type, and tokens per answer. Types missing from the file print as `n/a`.
+Official `_abs` items put a prose explanation in `answer`. That sentence is not a trap token, so those items are **unscored** unless the pack sets `abstain_trap`. They do not change `ok` or the scored count.
+
+The report is a substring check, not official LongMemEval accuracy. Full-sentence gold answers in a downloaded pack will usually miss. Types missing from the file, and unscored abstention, print as `n/a`.
 
 Official instances have no extract labels. The pilot adds optional `ops` on user turns so `FakeExtractor` can apply them. A hosted-model run of the full pack is a later slice.
 
-Session dates (`haystack_dates`) are passed to `add(occurred_at=…)` when they parse.
+Session dates (`YYYY/MM/DD [(Mon)] [HH:MM]`) keep their time. Stamps that do not parse are omitted (`occurred_at` stays unset) instead of sharing one fallback clock.

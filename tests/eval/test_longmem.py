@@ -7,6 +7,7 @@ from tensemem.eval.longmem import (
     format_report,
     load_items,
     run_longmem,
+    session_stamp,
 )
 
 
@@ -84,3 +85,33 @@ def test_load_jsonl_and_empty_answer(tmp_path: Path) -> None:
     report = run_longmem(path)
     assert report.ok == 0
     assert report.cases == 1
+
+
+def test_official_abstention_without_trap_is_unscored(tmp_path: Path) -> None:
+    path = tmp_path / "abs.json"
+    path.write_text(
+        json.dumps(
+            [
+                {
+                    "question_id": "official_abs",
+                    "question_type": "single-session-user",
+                    "question": "Are we staying in Bali?",
+                    "answer": "The user never said they would stay in Bali.",
+                    "haystack_sessions": [[{"role": "user", "content": "thanks"}]],
+                }
+            ]
+        ),
+        encoding="utf-8",
+    )
+    report = run_longmem(path)
+    assert report.cases == 0
+    assert report.ok == 0
+    assert report.by_type["abstention"].n == 0
+    assert report.by_type["abstention"].accuracy is None
+
+
+def test_session_stamp_keeps_lme_time_and_drops_unknown() -> None:
+    stamp = session_stamp("2026/06/01 (Mon) 09:00")
+    assert stamp == "2026-06-01T09:00:00.000000Z"
+    assert session_stamp("2026-03-01") == "2026-03-01T00:00:00.000000Z"
+    assert session_stamp("not a date") is None

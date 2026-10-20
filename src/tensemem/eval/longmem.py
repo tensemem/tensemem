@@ -13,8 +13,8 @@ from typing import Literal, cast
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field
 
-from tensemem.core.clock import FrozenClock
-from tensemem.core.models import ExtractedOp, ExtractionResult, PredicateSpec
+from tensemem.core.clock import FrozenClock, format_instant
+from tensemem.core.models import ExtractedOp, ExtractionResult, PredicateSpec, ValidPrecision
 from tensemem.core.ontology import Ontology
 from tensemem.core.temporal import resolve_valid_time
 from tensemem.eval.tensebench import BenchPredicate, ScriptedOp
@@ -40,6 +40,11 @@ _TYPES: tuple[str, ...] = (
 )
 _PACKAGED = "longmem_pilot.json"
 _REF = "2026-10-18T11:00:00.000000Z"
+_LME_DATE = re.compile(
+    r"^(\d{4})/(\d{2})/(\d{2})"
+    r"(?:\s+\([A-Za-z]{3}\))?"
+    r"(?:\s+(\d{2}):(\d{2})(?::(\d{2}))?)?$"
+)
 
 
 class LmeTurn(BaseModel):
@@ -62,6 +67,7 @@ class LmeItem(BaseModel):
     question_type: str
     question: str
     answer: str = ""
+    abstain_trap: str | None = None
     question_date: str = ""
     haystack_session_ids: tuple[str, ...] = ()
     haystack_dates: tuple[str, ...] = ()
@@ -145,11 +151,11 @@ def run_longmem(path: Path | None = None) -> LongMemReport:
     acc = _Acc()
     for item in items:
         _score(item, acc)
-    return acc.freeze(len(items))
+    return acc.freeze()
 
 
 def format_report(report: LongMemReport) -> str:
-    lines = [f"LongMemEval adapter  cases: {report.cases}"]
+    lines = [f"LongMemEval adapter  scored: {report.cases}"]
     lines.append(f"  accuracy: {_fmt(report.accuracy, report.ok, report.cases)}")
     for name in (*_TYPES, "abstention"):
         score = report.by_type.get(name)
@@ -174,7 +180,7 @@ def _score(item: LmeItem, acc: _Acc) -> None:
     ) as mem:
         mem.seed(_ontology(item))
         for index, session in enumerate(item.haystack_sessions):
-            occurred = _occurred_at(_date_at(item.haystack_dates, index))
+            occurred = session_stamp(_date_at(item.haystack_dates, index))
             for turn in session:
                 if turn.role != "user" or not turn.content.strip():
                     continue
@@ -188,15 +194,21 @@ def _score(item: LmeItem, acc: _Acc) -> None:
     acc.token_sum += ctx.token_count
     acc.token_n += 1
     hit = _hit(item, ctx.text)
+    if hit is None:
+        return
     bucket = "abstention" if item.abstention else item.question_type
     acc.bump(bucket, hit)
 
 
-def _hit(item: LmeItem, text: str) -> bool:
+def _hit(item: LmeItem, text: str) -> bool | None:
+    """``None`` means the item is not scored (official abstention prose)."""
+    if item.abstention:
+        trap = (item.abstain_trap or "").strip()
+        if not trap:
+            return None
+        return not _mentions(_current_section(text), trap)
     if not item.answer.strip():
         return False
-    if item.abstention:
-        return not _mentions(_current_section(text), item.answer)
     return _mentions(text, item.answer)
 
 
@@ -246,13 +258,40 @@ def _date_at(dates: Sequence[str], index: int) -> str:
     return ""
 
 
-def _occurred_at(raw: str) -> str | None:
+def session_stamp(raw: str) -> str | None:
+    """Parse a LongMemEval session stamp, or an ISO date with known precision."""
     text = raw.strip()
     if not text:
         return None
+    parsed = _parse_lme_stamp(text)
+    if parsed is not None:
+        return format_instant(parsed)
     try:
-        return resolve_valid_time(text, reference_time=_REF).valid_from
+        resolved = resolve_valid_time(text, reference_time=_REF)
     except (ValueError, TypeError):
+        return None
+    if resolved.valid_precision is ValidPrecision.UNKNOWN:
+        return None
+    return resolved.valid_from
+
+
+def _parse_lme_stamp(text: str) -> datetime | None:
+    """``YYYY/MM/DD [(Mon)] [HH:MM[:SS]]`` as used in published haystack dates."""
+    match = _LME_DATE.match(text)
+    if match is None:
+        return None
+    year, month, day, hour, minute, second = match.groups()
+    try:
+        return datetime(
+            int(year),
+            int(month),
+            int(day),
+            int(hour or 0),
+            int(minute or 0),
+            int(second or 0),
+            tzinfo=UTC,
+        )
+    except ValueError:
         return None
 
 
@@ -297,12 +336,14 @@ class _Acc:
             self.ok += 1
             bucket[0] += 1
 
-    def freeze(self, cases: int) -> LongMemReport:
+    def freeze(self) -> LongMemReport:
         by_type = {name: TypeScore(name=name, ok=0, n=0) for name in (*_TYPES, "abstention")}
+        scored = 0
         for name, (ok, n) in self.types.items():
             by_type[name] = TypeScore(name=name, ok=ok, n=n)
+            scored += n
         return LongMemReport(
-            cases=cases,
+            cases=scored,
             ok=self.ok,
             token_sum=self.token_sum,
             token_n=self.token_n,
