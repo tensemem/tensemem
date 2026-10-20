@@ -69,6 +69,7 @@ packages = ["src/tensemem"]
 [tool.hatch.build.targets.wheel.force-include]
 "src/tensemem/eval/tensebench_v1.jsonl" = "tensemem/eval/tensebench_v1.jsonl"
 "src/tensemem/eval/longmem_pilot.json" = "tensemem/eval/longmem_pilot.json"
+"src/tensemem/eval/locomo_pilot.json" = "tensemem/eval/locomo_pilot.json"
 
 [tool.hatch.build.targets.sdist]
 include = ["src", "tests", "examples", "docs", "README.md", "LICENSE", "pyproject.toml", "mkdocs.yml"]

@@ -16,6 +16,7 @@ Each record captures one significant design decision: the context, what we chose
 | [0010](0010-mcp-stdio.md) | MCP is a stdio adapter over the same engine | Accepted |
 | [0011](0011-rest-serve.md) | REST is an HTTP adapter over the same engine | Accepted |
 | [0012](0012-longmem-adapter.md) | Long-session packs reuse the engine, not a second memory API | Accepted |
+| [0013](0013-locomo-adapter.md) | LoCoMo packs reuse the same context() scorer | Accepted |
 
 ## Template
 

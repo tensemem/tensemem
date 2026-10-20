@@ -120,6 +120,10 @@ def _parser() -> argparse.ArgumentParser:
     longmem.add_argument("--path", type=Path, default=None, help="JSON array or JSONL")
     longmem.set_defaults(handler=_cmd_longmem)
 
+    locomo = sub.add_parser("locomo", help="score a LoCoMo-shaped pack (no database)")
+    locomo.add_argument("--path", type=Path, default=None, help="JSON array or JSONL")
+    locomo.set_defaults(handler=_cmd_locomo)
+
     mcp_p = sub.add_parser("mcp", help="stdio MCP server (needs tensemem[mcp])")
     mcp_p.add_argument("--user", default="", help="default user_id when a tool omits it")
     mcp_p.set_defaults(handler=_cmd_mcp)
@@ -312,6 +316,17 @@ def _cmd_longmem(args: argparse.Namespace) -> int:
     from tensemem.eval.longmem import format_report, run_longmem
 
     report = run_longmem(args.path)
+    if args.json:
+        print(json.dumps(report.model_dump(mode="json"), indent=2))
+        return 0
+    print(format_report(report))
+    return 0
+
+
+def _cmd_locomo(args: argparse.Namespace) -> int:
+    from tensemem.eval.locomo import format_report, run_locomo
+
+    report = run_locomo(args.path)
     if args.json:
         print(json.dumps(report.model_dump(mode="json"), indent=2))
         return 0

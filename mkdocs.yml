@@ -13,6 +13,7 @@ nav:
   - REST: server.md
   - TenseBench: tensebench.md
   - Long-session eval: longmem.md
+  - LoCoMo eval: locomo.md
   - Golden extract: golden.md
   - Context latency: latency.md
   - Operations: ops.md

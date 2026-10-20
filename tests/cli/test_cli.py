@@ -86,6 +86,17 @@ def test_longmem_prints_category_metrics(capsys: pytest.CaptureFixture[str]) -> 
     assert "abstention" in payload
 
 
+def test_locomo_prints_category_metrics(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["locomo"]) == 0
+    out = capsys.readouterr().out
+    assert "LoCoMo adapter" in out
+    assert "multi-hop:" in out
+    assert main(["--json", "locomo"]) == 0
+    payload = capsys.readouterr().out
+    assert '"cases"' in payload
+    assert "adversarial" in payload
+
+
 def test_bench_prints_pilot_metrics(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["bench", "--system", "tensemem"]) == 0
     out = capsys.readouterr().out

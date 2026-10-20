@@ -1,4 +1,4 @@
-"""Print golden-set scores, TenseBench, LongMemEval, or context() latency."""
+"""Print golden-set scores, TenseBench, LongMemEval, LoCoMo, or context() latency."""
 
 from __future__ import annotations
 
@@ -23,6 +23,9 @@ def main(argv: list[str] | None = None) -> None:
         return
     if raw[:1] == ["longmem"]:
         _longmem(raw[1:])
+        return
+    if raw[:1] == ["locomo"]:
+        _locomo(raw[1:])
         return
     parser = argparse.ArgumentParser(description="Score extract against labeled utterances.")
     parser.add_argument(
@@ -73,6 +76,16 @@ def _longmem(argv: list[str]) -> None:
     parser.add_argument("--path", type=Path, default=None)
     args = parser.parse_args(argv)
     print(format_longmem(run_longmem(args.path)))
+
+
+def _locomo(argv: list[str]) -> None:
+    from tensemem.eval.locomo import format_report as format_locomo
+    from tensemem.eval.locomo import run_locomo
+
+    parser = argparse.ArgumentParser(description="Score a LoCoMo-shaped pack.")
+    parser.add_argument("--path", type=Path, default=None)
+    args = parser.parse_args(argv)
+    print(format_locomo(run_locomo(args.path)))
 
 
 if __name__ == "__main__":

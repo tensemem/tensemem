@@ -1,0 +1,111 @@
+[
+  {
+    "sample_id": "locomo-gst-itinerary",
+    "conversation": {
+      "speaker_a": "Priya",
+      "speaker_b": "Omar",
+      "session_1_date_time": "9:00 am on 1 June, 2026",
+      "session_1": [
+        {
+          "speaker": "Priya",
+          "dia_id": "D1:1",
+          "text": "For this GST cycle we file GSTR-1 from Maharashtra and the books are in Tally.",
+          "ops": [
+            {"predicate": "files_return", "object": "GSTR-1", "evidence": "we file GSTR-1"},
+            {"predicate": "gst_state", "object": "Maharashtra", "evidence": "from Maharashtra"},
+            {"predicate": "uses_software", "object": "Tally", "evidence": "the books are in Tally"}
+          ]
+        },
+        {
+          "speaker": "Omar",
+          "dia_id": "D1:2",
+          "text": "I'll send vendor invoices to the accounts inbox.",
+          "ops": [
+            {"predicate": "invoice_inbox", "object": "accounts inbox", "evidence": "to the accounts inbox"}
+          ]
+        }
+      ],
+      "session_2_date_time": "3:00 pm on 9 July, 2026",
+      "session_2": [
+        {
+          "speaker": "Priya",
+          "dia_id": "D2:1",
+          "text": "Update on GST: we now file from Karnataka. Still GSTR-1. Tally stays.",
+          "ops": [
+            {"predicate": "files_return", "object": "GSTR-1", "evidence": "Still GSTR-1"},
+            {"predicate": "gst_state", "object": "Karnataka", "evidence": "file from Karnataka"},
+            {"predicate": "uses_software", "object": "Tally", "evidence": "Tally stays"}
+          ]
+        },
+        {
+          "speaker": "Omar",
+          "dia_id": "D2:2",
+          "text": "Invoices now go to the vendor desk inbox.",
+          "ops": [
+            {"predicate": "invoice_inbox", "object": "vendor desk inbox", "evidence": "to the vendor desk inbox"}
+          ]
+        }
+      ],
+      "session_3_date_time": "10:00 am on 10 July, 2026",
+      "session_3": [
+        {
+          "speaker": "Priya",
+          "dia_id": "D3:1",
+          "text": "For the Singapore workshop the hotel is Marina Bay. Vegetarian meals on the flights.",
+          "ops": [
+            {"predicate": "trip_destination", "object": "Singapore", "evidence": "the Singapore workshop"},
+            {"predicate": "hotel", "object": "Marina Bay", "evidence": "the hotel is Marina Bay"},
+            {"predicate": "meal_preference", "object": "vegetarian", "evidence": "Vegetarian meals"}
+          ]
+        },
+        {
+          "speaker": "Omar",
+          "dia_id": "D3:2",
+          "text": "I might book two extra nights in Bali if the client pays."
+        }
+      ]
+    },
+    "qa": [
+      {
+        "question": "Which hotel is booked for the workshop?",
+        "answer": "Marina Bay",
+        "evidence": ["D3:1"],
+        "category": 4
+      },
+      {
+        "question": "Which state do we file GST from now, and which inbox gets invoices?",
+        "answer": "Karnataka, vendor desk inbox",
+        "evidence": ["D2:1", "D2:2"],
+        "category": 1
+      },
+      {
+        "question": "Where did we file GST before the Karnataka change?",
+        "answer": "Maharashtra",
+        "evidence": ["D1:1", "D2:1"],
+        "category": 2
+      },
+      {
+        "question": "What software holds the books?",
+        "answer": "Tally; accounting ledger",
+        "evidence": ["D1:1"],
+        "category": 3
+      },
+      {
+        "question": "Are we staying in Bali after Singapore?",
+        "answer": "The conversation does not confirm a stay in Bali.",
+        "evidence": ["D3:2"],
+        "category": 5,
+        "abstain_trap": "Bali"
+      }
+    ],
+    "predicates": [
+      {"name": "files_return"},
+      {"name": "gst_state"},
+      {"name": "uses_software"},
+      {"name": "invoice_inbox"},
+      {"name": "trip_destination"},
+      {"name": "hotel"},
+      {"name": "meal_preference"}
+    ]
+  }
+]
