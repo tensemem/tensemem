@@ -9,6 +9,7 @@ from tensemem.eval.golden import (
     score_ops,
 )
 from tensemem.eval.latency import LatencyReport, run_latency
+from tensemem.eval.longmem import LongMemReport, run_longmem
 from tensemem.eval.tensebench import BenchReport, Scenario, run_suite
 
 __all__ = [
@@ -16,11 +17,13 @@ __all__ = [
     "GoldCase",
     "GoldOp",
     "LatencyReport",
+    "LongMemReport",
     "Report",
     "Scenario",
     "evaluate",
     "load_cases",
     "run_latency",
+    "run_longmem",
     "run_suite",
     "score_ops",
 ]

@@ -48,6 +48,7 @@ tensemem history --user u1 lives_in
 tensemem search --user u1 "where did I live"
 tensemem jobs
 tensemem bench
+tensemem longmem
 tensemem latency
 tensemem mcp --user u1
 tensemem serve
@@ -57,7 +58,7 @@ tensemem serve
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and workflow, [docs/](docs/) for the docs site (quickstart, concepts, API, CLI, MCP, REST, TenseBench, ops), and [docs/adr](docs/adr) for the design decisions behind the engine. Labeled extract cases (150+) live in `tests/golden/`; `pytest tests/golden` scores `FakeExtractor`, and `python -m tensemem.eval` prints precision and recall. `tensemem bench` (or `python -m tensemem.eval bench`) scores the TenseBench pilot. `tensemem latency` (or `python -m tensemem.eval latency`) times empty-query `context()`. Preview docs with `uvx mkdocs serve`.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and workflow, [docs/](docs/) for the docs site (quickstart, concepts, API, CLI, MCP, REST, TenseBench, ops), and [docs/adr](docs/adr) for the design decisions behind the engine. Labeled extract cases (150+) live in `tests/golden/`; `pytest tests/golden` scores `FakeExtractor`, and `python -m tensemem.eval` prints precision and recall. `tensemem bench` (or `python -m tensemem.eval bench`) scores the TenseBench pack. `tensemem longmem` (or `python -m tensemem.eval longmem`) scores a LongMemEval-shaped JSON pack. `tensemem latency` (or `python -m tensemem.eval latency`) times empty-query `context()`. Preview docs with `uvx mkdocs serve`.
 
 ## License
 

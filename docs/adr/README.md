@@ -15,6 +15,7 @@ Each record captures one significant design decision: the context, what we chose
 | [0009](0009-tensebench-safe-to-act.md) | TenseBench scores safe-to-act-on properties | Accepted |
 | [0010](0010-mcp-stdio.md) | MCP is a stdio adapter over the same engine | Accepted |
 | [0011](0011-rest-serve.md) | REST is an HTTP adapter over the same engine | Accepted |
+| [0012](0012-longmem-adapter.md) | Long-session packs reuse the engine, not a second memory API | Accepted |
 
 ## Template
 

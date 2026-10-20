@@ -23,7 +23,7 @@ uv run pytest
 uvx codespell --skip="*.lock,.git,uv.lock" --ignore-words-list="tensemem"
 ```
 
-The `tensemem` CLI (`python -m tensemem --help`) reads a SQLite file; it does not start the extract worker. `tensemem bench` and `tensemem latency` are the exceptions: they do not open a database. `tensemem mcp` and `tensemem serve` create the file if missing and run `FakeExtractor` inside add (`uv sync --extra mcp` / `--extra server`); they do not drain jobs already queued in that file. Docs live in `docs/` with `mkdocs.yml` at the repo root (`uvx mkdocs serve` to preview). Property tests live in `tests/property/` (Hypothesis, 40 examples in CI; `HYPOTHESIS_PROFILE=dev` for a longer run). The golden extract set (`tests/golden/v1.jsonl`, 150+ labeled utterances) is scored with `python -m tensemem.eval` / `pytest tests/golden`.
+The `tensemem` CLI (`python -m tensemem --help`) reads a SQLite file; it does not start the extract worker. `tensemem bench`, `tensemem longmem`, and `tensemem latency` are the exceptions: they do not open a database. `tensemem mcp` and `tensemem serve` create the file if missing and run `FakeExtractor` inside add (`uv sync --extra mcp` / `--extra server`); they do not drain jobs already queued in that file. Docs live in `docs/` with `mkdocs.yml` at the repo root (`uvx mkdocs serve` to preview). Property tests live in `tests/property/` (Hypothesis, 40 examples in CI; `HYPOTHESIS_PROFILE=dev` for a longer run). The golden extract set (`tests/golden/v1.jsonl`, 150+ labeled utterances) is scored with `python -m tensemem.eval` / `pytest tests/golden`.
 
 Default pytest never calls a model. To run the live extract locally after `uv sync --extra openai`:
 

@@ -19,6 +19,7 @@ tensemem rebuild --user u1
 tensemem backup copy.db
 tensemem stats --user u1
 tensemem bench
+tensemem longmem
 tensemem latency
 tensemem mcp --user u1
 tensemem serve
@@ -27,6 +28,8 @@ tensemem serve
 Global flags: `--db path.db`, `--json`, `--agent`, `--namespace`.
 
 `tensemem bench` does not open a database. It scores the packaged TenseBench set (override with `--path`) against TenseMem, concatenated history, and token-overlap retrieval. See [TenseBench](tensebench.md).
+
+`tensemem longmem` also skips the database. It loads a LongMemEval-shaped JSON array (or JSONL) and scores `context()` against each gold answer. Default is the packaged 7-item pilot. See [Long-session eval](longmem.md).
 
 `tensemem latency` also skips the database file. It seeds ACTIVE facts in memory and times empty-query `context()`. See [Context latency](latency.md).
 

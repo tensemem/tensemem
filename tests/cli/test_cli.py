@@ -75,6 +75,17 @@ def test_inspect_missing_database_does_not_create_one(
     assert not missing.exists()
 
 
+def test_longmem_prints_category_metrics(capsys: pytest.CaptureFixture[str]) -> None:
+    assert main(["longmem"]) == 0
+    out = capsys.readouterr().out
+    assert "LongMemEval adapter" in out
+    assert "knowledge-update:" in out
+    assert main(["--json", "longmem"]) == 0
+    payload = capsys.readouterr().out
+    assert '"cases"' in payload
+    assert "abstention" in payload
+
+
 def test_bench_prints_pilot_metrics(capsys: pytest.CaptureFixture[str]) -> None:
     assert main(["bench", "--system", "tensemem"]) == 0
     out = capsys.readouterr().out

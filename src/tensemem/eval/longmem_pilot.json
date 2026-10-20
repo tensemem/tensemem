@@ -1,0 +1,209 @@
+[
+  {
+    "question_id": "lme-gst-state",
+    "question_type": "single-session-user",
+    "question": "Which state do we file GST from?",
+    "answer": "Maharashtra",
+    "question_date": "2026/06/02 (Tue) 10:00",
+    "haystack_session_ids": ["s1"],
+    "haystack_dates": ["2026/06/01 (Mon) 09:00"],
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "For this GST cycle we file GSTR-1 from Maharashtra and the books are in Tally.",
+          "has_answer": true,
+          "ops": [
+            {"predicate": "files_return", "object": "GSTR-1", "evidence": "we file GSTR-1"},
+            {"predicate": "gst_state", "object": "Maharashtra", "evidence": "from Maharashtra"},
+            {"predicate": "uses_software", "object": "Tally", "evidence": "the books are in Tally"}
+          ]
+        },
+        {"role": "assistant", "content": "Noted. I will use Maharashtra for the GSTR-1 filing."}
+      ]
+    ],
+    "answer_session_ids": ["s1"],
+    "predicates": [
+      {"name": "files_return"},
+      {"name": "gst_state"},
+      {"name": "uses_software"}
+    ]
+  },
+  {
+    "question_id": "lme-hotel-confirm",
+    "question_type": "single-session-assistant",
+    "question": "Which hotel is booked?",
+    "answer": "Marina Bay",
+    "question_date": "2026/04/12 (Sun) 18:00",
+    "haystack_session_ids": ["s1"],
+    "haystack_dates": ["2026/04/12 (Sun) 16:00"],
+    "haystack_sessions": [
+      [
+        {"role": "assistant", "content": "I can hold Marina Bay for the Singapore workshop."},
+        {
+          "role": "user",
+          "content": "Yes, book Marina Bay. Vegetarian meals on the flights please.",
+          "has_answer": true,
+          "ops": [
+            {"predicate": "hotel", "object": "Marina Bay", "evidence": "book Marina Bay"},
+            {"predicate": "meal_preference", "object": "vegetarian", "evidence": "Vegetarian meals"}
+          ]
+        }
+      ]
+    ],
+    "answer_session_ids": ["s1"],
+    "predicates": [{"name": "hotel"}, {"name": "meal_preference"}]
+  },
+  {
+    "question_id": "lme-meal-pref",
+    "question_type": "single-session-preference",
+    "question": "What meals do I need on the flights?",
+    "answer": "vegetarian",
+    "question_date": "2026/04/13 (Mon) 08:00",
+    "haystack_session_ids": ["s1"],
+    "haystack_dates": ["2026/04/12 (Sun) 16:00"],
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "For the Singapore trip I land Monday evening and I need vegetarian meals on the flights.",
+          "has_answer": true,
+          "ops": [
+            {"predicate": "trip_destination", "object": "Singapore", "evidence": "the Singapore trip"},
+            {"predicate": "meal_preference", "object": "vegetarian", "evidence": "I need vegetarian meals"}
+          ]
+        }
+      ]
+    ],
+    "answer_session_ids": ["s1"],
+    "predicates": [{"name": "trip_destination"}, {"name": "meal_preference"}]
+  },
+  {
+    "question_id": "lme-gst-update",
+    "question_type": "knowledge-update",
+    "question": "Which state do we file GST from now?",
+    "answer": "Karnataka",
+    "question_date": "2026/07/10 (Fri) 11:00",
+    "haystack_session_ids": ["s1", "s2"],
+    "haystack_dates": ["2026/06/01 (Mon) 09:00", "2026/07/09 (Thu) 15:00"],
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "We file GSTR-1 from Maharashtra this cycle.",
+          "ops": [
+            {"predicate": "files_return", "object": "GSTR-1", "evidence": "We file GSTR-1"},
+            {"predicate": "gst_state", "object": "Maharashtra", "evidence": "from Maharashtra"}
+          ]
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "Update on GST: we now file from Karnataka. Still GSTR-1.",
+          "has_answer": true,
+          "ops": [
+            {"predicate": "files_return", "object": "GSTR-1", "evidence": "Still GSTR-1"},
+            {"predicate": "gst_state", "object": "Karnataka", "evidence": "file from Karnataka"}
+          ]
+        }
+      ]
+    ],
+    "answer_session_ids": ["s2"],
+    "predicates": [{"name": "files_return"}, {"name": "gst_state"}]
+  },
+  {
+    "question_id": "lme-gst-before",
+    "question_type": "temporal-reasoning",
+    "question": "Where did we file GST before the Karnataka change?",
+    "answer": "Maharashtra",
+    "question_date": "2026/07/10 (Fri) 11:00",
+    "haystack_session_ids": ["s1", "s2"],
+    "haystack_dates": ["2026/06/01 (Mon) 09:00", "2026/07/09 (Thu) 15:00"],
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "We file GSTR-1 from Maharashtra this cycle.",
+          "has_answer": true,
+          "ops": [
+            {"predicate": "files_return", "object": "GSTR-1", "evidence": "We file GSTR-1"},
+            {"predicate": "gst_state", "object": "Maharashtra", "evidence": "from Maharashtra"}
+          ]
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "Update on GST: we now file from Karnataka. Still GSTR-1.",
+          "ops": [
+            {"predicate": "files_return", "object": "GSTR-1", "evidence": "Still GSTR-1"},
+            {"predicate": "gst_state", "object": "Karnataka", "evidence": "file from Karnataka"}
+          ]
+        }
+      ]
+    ],
+    "answer_session_ids": ["s1"],
+    "predicates": [{"name": "files_return"}, {"name": "gst_state"}]
+  },
+  {
+    "question_id": "lme-inbox-sessions",
+    "question_type": "multi-session",
+    "question": "Which inbox gets vendor invoices?",
+    "answer": "vendor desk inbox",
+    "question_date": "2026/05/20 (Wed) 09:00",
+    "haystack_session_ids": ["s1", "s2"],
+    "haystack_dates": ["2026/05/01 (Fri) 10:00", "2026/05/19 (Tue) 17:00"],
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "For vendor invoices, send them to the accounts inbox and CC the finance list.",
+          "ops": [
+            {"predicate": "invoice_inbox", "object": "accounts inbox", "evidence": "to the accounts inbox"},
+            {"predicate": "cc_list", "object": "finance list", "op": "ADD", "evidence": "CC the finance list"}
+          ]
+        }
+      ],
+      [
+        {
+          "role": "user",
+          "content": "Invoices now go to the vendor desk inbox. Keep the finance CC.",
+          "has_answer": true,
+          "ops": [
+            {"predicate": "invoice_inbox", "object": "vendor desk inbox", "evidence": "to the vendor desk inbox"},
+            {"predicate": "cc_list", "object": "finance list", "op": "ADD", "evidence": "the finance CC"}
+          ]
+        }
+      ]
+    ],
+    "answer_session_ids": ["s2"],
+    "predicates": [
+      {"name": "invoice_inbox"},
+      {"name": "cc_list", "cardinality": "MANY"}
+    ]
+  },
+  {
+    "question_id": "lme-no-bali_abs",
+    "question_type": "single-session-user",
+    "question": "Are we staying in Bali after Singapore?",
+    "answer": "Bali",
+    "question_date": "2026/04/13 (Mon) 08:00",
+    "haystack_session_ids": ["s1"],
+    "haystack_dates": ["2026/04/12 (Sun) 16:00"],
+    "haystack_sessions": [
+      [
+        {
+          "role": "user",
+          "content": "For the Singapore trip: hotel is Marina Bay. I might stay two extra nights in Bali if the client pays.",
+          "ops": [
+            {"predicate": "trip_destination", "object": "Singapore", "evidence": "the Singapore trip"},
+            {"predicate": "hotel", "object": "Marina Bay", "evidence": "hotel is Marina Bay"}
+          ]
+        }
+      ]
+    ],
+    "answer_session_ids": ["s1"],
+    "predicates": [{"name": "trip_destination"}, {"name": "hotel"}]
+  }
+]

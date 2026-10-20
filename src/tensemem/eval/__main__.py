@@ -1,4 +1,4 @@
-"""Print golden-set scores, TenseBench, or context() latency."""
+"""Print golden-set scores, TenseBench, LongMemEval, or context() latency."""
 
 from __future__ import annotations
 
@@ -20,6 +20,9 @@ def main(argv: list[str] | None = None) -> None:
         return
     if raw[:1] == ["latency"]:
         _latency(raw[1:])
+        return
+    if raw[:1] == ["longmem"]:
+        _longmem(raw[1:])
         return
     parser = argparse.ArgumentParser(description="Score extract against labeled utterances.")
     parser.add_argument(
@@ -60,6 +63,16 @@ def _latency(argv: list[str]) -> None:
     if args.rounds is not None:
         kwargs["rounds"] = args.rounds
     print(format_latency(run_latency(**kwargs)))
+
+
+def _longmem(argv: list[str]) -> None:
+    from tensemem.eval.longmem import format_report as format_longmem
+    from tensemem.eval.longmem import run_longmem
+
+    parser = argparse.ArgumentParser(description="Score a LongMemEval-shaped pack.")
+    parser.add_argument("--path", type=Path, default=None)
+    args = parser.parse_args(argv)
+    print(format_longmem(run_longmem(args.path)))
 
 
 if __name__ == "__main__":
