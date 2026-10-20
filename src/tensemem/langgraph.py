@@ -17,7 +17,7 @@ _TEXT_FIELDS = ("text", "content", "memory")
 
 
 class StoreItem(BaseModel):
-    """One store row. Compatible with LangGraph ``Item`` field names."""
+    """One adapter row: namespace, key, and value. No created/updated timestamps."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -27,7 +27,11 @@ class StoreItem(BaseModel):
 
 
 class TenseMemStore:
-    """Thin store over one ``Memory``. ``put`` ingests text; it does not SET slots."""
+    """Thin store over one ``Memory``. ``put`` ingests text; it does not SET slots.
+
+    Sync and async verbs are for direct calls or ``await store.aput(...)`` in a
+    node. This class does not subclass the framework store ABC.
+    """
 
     def __init__(
         self,
@@ -109,6 +113,33 @@ class TenseMemStore:
         user_id, agent_id = _user_agent(namespace)
         self.mem.forget(user_id, agent_id=agent_id, namespace=self.namespace)
 
+    async def aput(
+        self,
+        namespace: Sequence[str],
+        key: str,
+        value: Mapping[str, object],
+        **kwargs: object,
+    ) -> None:
+        self.put(namespace, key, value, **kwargs)
+
+    async def asearch(
+        self,
+        namespace: Sequence[str],
+        /,
+        *,
+        query: str | None = None,
+        limit: int = 10,
+        offset: int = 0,
+        **kwargs: object,
+    ) -> list[StoreItem]:
+        return self.search(namespace, query=query, limit=limit, offset=offset, **kwargs)
+
+    async def aget(self, namespace: Sequence[str], key: str, **kwargs: object) -> StoreItem | None:
+        return self.get(namespace, key, **kwargs)
+
+    async def adelete(self, namespace: Sequence[str], key: str, **kwargs: object) -> None:
+        self.delete(namespace, key, **kwargs)
+
 
 def _user_agent(namespace: Sequence[str]) -> tuple[str, str]:
     if not namespace:
@@ -116,6 +147,8 @@ def _user_agent(namespace: Sequence[str]) -> tuple[str, str]:
     user_id = str(namespace[0]).strip()
     if not user_id:
         raise ValueError("namespace[0] is user_id")
+    if len(namespace) > 2:
+        raise ValueError("namespace supports at most user_id and agent_id")
     agent_id = str(namespace[1]).strip() if len(namespace) > 1 else ""
     return user_id, agent_id
 

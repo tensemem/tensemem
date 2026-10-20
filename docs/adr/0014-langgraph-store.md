@@ -9,8 +9,8 @@ Graphs that inject a store call `put` / `search` / `get` / `delete` with a names
 
 ## Decision
 
-1. **`TenseMemStore` maps store verbs onto the engine:** `put` → `add()` of `value.text` (or `content` / `memory`), `search` / `get("context")` → `context()`, `get("state")` → `state()`, `delete("scope")` → `forget()`. The store key on `put` is ignored.
-2. **`namespace[0]` is `user_id`.** `namespace[1]` is optional `agent_id`. The engine namespace string is set on the store, not the tuple.
+1. **`TenseMemStore` maps store verbs onto the engine:** `put` / `aput` → `add()` of `value.text` (or `content` / `memory`), `search` / `asearch` / `get("context")` → `context()`, `get("state")` → `state()`, `delete("scope")` → `forget()`. The store key on `put` is ignored. Async verbs call the sync methods; the class does not subclass the framework store ABC.
+2. **`namespace[0]` is `user_id`.** `namespace[1]` is optional `agent_id`. Longer tuples are rejected. The engine namespace string is set on the store, not the tuple.
 3. **The adapter does not import the framework.** `tensemem[langgraph]` is an optional extra so an app can install both packages together. CI scores the mapping without that extra.
 
 ## Alternatives considered

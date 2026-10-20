@@ -5,7 +5,7 @@
 
 ## Context
 
-ADR 0010 is stdio MCP. ADR 0011 is REST without authentication. Hosts that speak Streamable HTTP, and any non-loopback bind, need a token in this process. TLS termination stays outside.
+ADR 0010 is stdio MCP. ADR 0011 is REST without authentication. Hosts that speak Streamable HTTP use `--http`. A bearer token is optional. Non-loopback binds warn when authentication and TLS are absent; they are not rejected. TLS termination stays outside.
 
 ## Decision
 

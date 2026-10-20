@@ -35,7 +35,7 @@ Host config (Streamable HTTP):
 }
 ```
 
-`--http` default bind is `127.0.0.1:8081`. Pass `--token` or `TENSEMEM_TOKEN` and send `Authorization: Bearer <token>`. This process does not terminate TLS. Keep it on loopback, or put a TLS proxy in front.
+`--http` default bind is `127.0.0.1:8081`. Set `TENSEMEM_TOKEN` (prefer the environment over `--token`, which appears in `argv`) and send `Authorization: Bearer <token>`. This process does not terminate TLS. Keep it on loopback, or put a TLS proxy in front.
 
 A fresh file is seeded with the FakeExtractor predicates (`lives_in`, `uses_language`, and the rest of that set) so `remember` can extract without a Python app calling `register_predicate` first. Re-opening the file is a no-op for those names.
 

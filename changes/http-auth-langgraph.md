@@ -6,4 +6,4 @@
 
 # Why
 
-A graph and a remote MCP host should hit the same engine. Non-loopback HTTP needed a token in-process; TLS stays in a proxy.
+A graph and a remote MCP host should hit the same engine. Non-loopback HTTP warns when a token and TLS are absent; a token stays optional. TLS stays in a proxy.

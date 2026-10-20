@@ -29,6 +29,8 @@ def test_authorize_open_or_bearer() -> None:
     assert authorize("secret", "secret") is False
     assert authorize(None, "secret") is False
     assert authorize("Bearer ", "secret") is False
+    assert authorize("Bearer café", "café") is True
+    assert authorize("Bearer café", "cafè") is False
 
 
 def test_require_auth_skips_health() -> None:

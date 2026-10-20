@@ -1,6 +1,6 @@
 # LangGraph store
 
-`TenseMemStore` is a thin store over one `Memory`. Graphs call `put` / `search`; the engine still extracts and `resolve()` still decides. Needs `tensemem[langgraph]` only to install the framework next to TenseMem — the adapter itself does not import it.
+`TenseMemStore` is a thin store over one `Memory`. Call `put` / `search` directly, or `await store.aput(...)` / `await store.asearch(...)` from a node. The adapter does not subclass the framework store ABC. The engine still extracts and `resolve()` still decides. Needs `tensemem[langgraph]` only to install the framework next to TenseMem — the adapter itself does not import it.
 
 ```python
 from tensemem import FakeExtractor, Memory
@@ -16,7 +16,7 @@ print(hits[0].value["text"])
 print(hits[0].value["freshness"]["is_current"])
 ```
 
-`namespace[0]` is `user_id`. `namespace[1]` is optional `agent_id`. The engine namespace string is `TenseMemStore(..., namespace="default")`.
+`namespace[0]` is `user_id`. `namespace[1]` is optional `agent_id`. Longer tuples are rejected. The engine namespace string is `TenseMemStore(..., namespace="default")`. `StoreItem` is `namespace`, `key`, and `value` only.
 
 ## Verbs
 

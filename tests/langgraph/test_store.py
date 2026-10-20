@@ -1,3 +1,5 @@
+import asyncio
+
 import pytest
 
 from tensemem import FakeExtractor, Memory
@@ -43,3 +45,27 @@ def test_put_rejects_slot_maps_and_empty_user() -> None:
             store.put((), "k", {"text": "I live in Delhi"})
         with pytest.raises(ValueError, match="scope"):
             store.delete(("u1",), "context")
+        with pytest.raises(ValueError, match="at most"):
+            store.put(("u1", "agent", "extra"), "k", {"text": "I live in Delhi"})
+
+
+def test_async_verbs_match_sync() -> None:
+    asyncio.run(_async_case())
+
+
+async def _async_case() -> None:
+    with Memory(":memory:", llm=FakeExtractor(), start_worker=False) as mem:
+        seed_starter(mem)
+        store = TenseMemStore(mem)
+        await store.aput(("u1", "ops"), "note", {"content": "I live in Pune"})
+        hits = await store.asearch(("u1", "ops"), query="where do I live")
+        assert "Pune" in str(hits[0].value["text"])
+        state = await store.aget(("u1", "ops"), STATE_KEY)
+        assert state is not None
+        values = state.value["values"]
+        assert isinstance(values, dict)
+        assert values["lives_in"] == "Pune"
+        await store.adelete(("u1", "ops"), SCOPE_KEY)
+        empty = await store.aget(("u1", "ops"), STATE_KEY)
+        assert empty is not None
+        assert empty.value["values"] == {}

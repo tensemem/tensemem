@@ -29,10 +29,10 @@ def authorize(authorization: str | None, token: str | None) -> bool:
     if not header.startswith(prefix):
         return False
     got = header[len(prefix) :].strip()
-    if len(got) != len(expected):
-        secrets.compare_digest(expected, expected)
-        return False
-    return secrets.compare_digest(got, expected)
+    return secrets.compare_digest(
+        got.encode("utf-8", "surrogatepass"),
+        expected.encode("utf-8", "surrogatepass"),
+    )
 
 
 def health_path(path: str) -> bool:

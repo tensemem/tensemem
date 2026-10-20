@@ -6,7 +6,7 @@
 pip install "tensemem[server]"
 tensemem --db /absolute/path/tensemem.db serve --port 8080
 export TENSEMEM_TOKEN=replace-me
-tensemem --db /absolute/path/tensemem.db serve --port 8080 --token "$TENSEMEM_TOKEN"
+tensemem --db /absolute/path/tensemem.db serve --port 8080
 ```
 
 Default bind is `127.0.0.1:8080`. `--db`, `--agent`, and `--namespace` are root flags (before `serve`).

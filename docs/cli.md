@@ -23,8 +23,8 @@ tensemem longmem
 tensemem locomo
 tensemem latency
 tensemem mcp --user u1
-tensemem mcp --http --token "$TENSEMEM_TOKEN"
-tensemem serve --token "$TENSEMEM_TOKEN"
+tensemem mcp --http
+tensemem serve
 ```
 
 Global flags: `--db path.db`, `--json`, `--agent`, `--namespace`.
