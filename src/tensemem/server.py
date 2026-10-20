@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import asyncio
 import importlib
 import json
-from collections.abc import Mapping
+import sys
+from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, Final, cast
 
@@ -15,6 +17,8 @@ from tensemem.providers.llm.fake import FakeExtractor
 _MISSING_EXTRA = "tensemem serve needs tensemem[server]"
 _DEFAULT_HOST = "127.0.0.1"
 _DEFAULT_PORT = 8080
+MAX_BODY_BYTES = 65_536
+_LOOPBACK = frozenset({"127.0.0.1", "::1", "localhost"})
 
 ROUTES: Final[tuple[tuple[str, str], ...]] = (
     ("POST", "/v1/memories:add"),
@@ -83,6 +87,12 @@ def serve(
     """
     if port < 1 or port > 65535:
         raise ValueError("port must be between 1 and 65535")
+    if not _is_loopback(host):
+        print(
+            "tensemem serve has no auth or TLS; bind loopback or put a "
+            "TLS-terminating, user-scoped proxy in front",
+            file=sys.stderr,
+        )
     with Memory(path, llm=FakeExtractor(), start_worker=False) as mem:
         seed_starter(mem)
         run_http(mem, host=host, port=port, agent_id=agent_id, namespace=namespace)
@@ -102,7 +112,14 @@ def create_app(
     async def handle(request: Any) -> Any:
         body: Mapping[str, object] = {}
         if request.method in {"POST", "PUT", "PATCH"}:
-            raw = await request.body()
+            chunks: list[bytes] = []
+            raw = b""
+            async for chunk in request.stream():
+                chunks.append(cast(bytes, chunk))
+                try:
+                    raw = limited_body(chunks)
+                except ValueError as extra:
+                    return json_response({"error": str(extra)}, status_code=413)
             if raw:
                 try:
                     parsed = json.loads(raw)
@@ -111,11 +128,15 @@ def create_app(
                 if not isinstance(parsed, dict):
                     return json_response({"error": "JSON object required"}, status_code=400)
                 body = cast(dict[str, object], parsed)
-        status, payload = dispatch(
+        query = dict(request.query_params)
+        path = request.url.path
+        method = request.method
+        status, payload = await asyncio.to_thread(
+            dispatch,
             mem,
-            request.method,
-            request.url.path,
-            query=dict(request.query_params),
+            method,
+            path,
+            query=query,
             body=body,
             agent_id=agent_id,
             namespace=namespace,
@@ -155,6 +176,26 @@ def _tool(
     if not isinstance(raw, dict):
         raise ValueError("tool returned a non-object")
     return cast(dict[str, object], raw)
+
+
+def limited_body(
+    chunks: Iterable[bytes],
+    *,
+    limit: int = MAX_BODY_BYTES,
+) -> bytes:
+    """Join ``chunks`` or raise if the total exceeds ``limit``."""
+    parts: list[bytes] = []
+    total = 0
+    for chunk in chunks:
+        total += len(chunk)
+        if total > limit:
+            raise ValueError("request body too large")
+        parts.append(chunk)
+    return b"".join(parts)
+
+
+def _is_loopback(host: str) -> bool:
+    return host.strip().casefold() in _LOOPBACK
 
 
 def _scope_user(method: str, path: str) -> str | None:

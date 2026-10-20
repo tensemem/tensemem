@@ -2,7 +2,8 @@
 
 - Add `tensemem serve`: HTTP adapter with `POST /v1/memories:add`, `POST /v1/context`, `GET /v1/state`, `GET /v1/history`, `DELETE /v1/scopes/{user_id}`, and `GET /health`, on the same SQLite file as the CLI.
 - Optional extra `tensemem[server]` (FastAPI + uvicorn). Route dispatch does not import it, so tests cover the mapping without the extra.
-- Same FakeExtractor + starter registry as MCP. Background worker stays off; add waits in the request.
+- Same FakeExtractor + starter registry as MCP. Background worker stays off; add waits in the request. POST bodies are capped; dispatch runs off the event loop.
+- Default bind is loopback. The process has no auth or TLS; docs require a user-scoped TLS proxy if `--host` is not loopback.
 
 # Why
 

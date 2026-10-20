@@ -6,7 +6,7 @@ import pytest
 from tensemem import FakeExtractor, Memory
 from tensemem.core.models import JobStatus
 from tensemem.mcp import seed_starter
-from tensemem.server import ROUTES, create_app, dispatch, serve
+from tensemem.server import MAX_BODY_BYTES, ROUTES, create_app, dispatch, limited_body, serve
 
 
 def test_dispatch_add_context_state_history_forget() -> None:
@@ -128,6 +128,35 @@ def test_serve_leaves_existing_jobs_queued(tmp_path: Path, monkeypatch: pytest.M
 def test_serve_rejects_bad_port(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="port"):
         serve(tmp_path / "t.db", port=0)
+
+
+def test_limited_body_rejects_oversize() -> None:
+    assert limited_body([b"ok"]) == b"ok"
+    assert limited_body([b"x" * MAX_BODY_BYTES]) == b"x" * MAX_BODY_BYTES
+    with pytest.raises(ValueError, match="too large"):
+        limited_body([b"x" * (MAX_BODY_BYTES + 1)])
+    with pytest.raises(ValueError, match="too large"):
+        limited_body([b"x" * 40_000, b"y" * 40_000])
+
+
+def test_serve_warns_when_host_is_not_loopback(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    def fake_http(
+        mem: Memory,
+        *,
+        host: str,
+        port: int,
+        agent_id: str = "",
+        namespace: str = "default",
+    ) -> None:
+        del mem, host, port, agent_id, namespace
+
+    monkeypatch.setattr("tensemem.server.run_http", fake_http)
+    serve(tmp_path / "t.db", host="0.0.0.0", port=8080)
+    assert "no auth or TLS" in capsys.readouterr().err
+    serve(tmp_path / "loop.db", host="127.0.0.1", port=8080)
+    assert capsys.readouterr().err == ""
 
 
 def _map(payload: dict[str, object], key: str) -> dict[str, object]:

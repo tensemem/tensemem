@@ -32,6 +32,6 @@ Global flags: `--db path.db`, `--json`, `--agent`, `--namespace`.
 
 `tensemem mcp` creates the SQLite file if missing and serves five tools on stdio (`remember`, `recall_context`, `get_state`, `get_history`, `forget`). `--db` is a root flag (`tensemem --db path.db mcp --user u1`). Needs `tensemem[mcp]`. See [MCP](mcp.md).
 
-`tensemem serve` is the HTTP adapter for those same five operations (`tensemem --db path.db serve --port 8080`). Needs `tensemem[server]`. See [REST](server.md).
+`tensemem serve` is the HTTP adapter for those same five operations (`tensemem --db path.db serve --port 8080`). Default bind is loopback; the process has no auth or TLS. Needs `tensemem[server]`. See [REST](server.md).
 
 `rebuild` from the CLI replays explicit ops and re-queues messages. Re-extract those messages from Python with `Memory(..., llm=...).rebuild(user_id, wait=True)`.

@@ -37,3 +37,5 @@ Numbered files live in the package (`0001_init.sql`, …) and run automatically 
 ## Concurrency
 
 One writer thread per `Memory` process. Two processes (or two `Memory` handles) on the same file serialize on `BEGIN IMMEDIATE` plus the busy timeout. `tensemem mcp` and `tensemem serve` are each one such process; inspect with the CLI while they run is safe. For heavy multi-process ingest, run one `tensemem serve` writer and talk to it over HTTP.
+
+`tensemem serve` has no authentication and no TLS. Keep the default loopback bind (`127.0.0.1`). If `--host` exposes it on a network, place a TLS-terminating reverse proxy in front that authenticates callers and authorizes the `user_id` they send. Anyone who can reach an unbound server can read or `DELETE` any scope.

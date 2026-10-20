@@ -121,7 +121,11 @@ def _parser() -> argparse.ArgumentParser:
     mcp_p.set_defaults(handler=_cmd_mcp)
 
     serve_p = sub.add_parser("serve", help="REST server (needs tensemem[server])")
-    serve_p.add_argument("--host", default="127.0.0.1")
+    serve_p.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="bind address (default 127.0.0.1; non-loopback needs a TLS proxy)",
+    )
     serve_p.add_argument("--port", type=int, default=8080)
     serve_p.set_defaults(handler=_cmd_serve)
 
