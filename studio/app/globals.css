@@ -55,6 +55,7 @@ table.facts .col-when { width: 11rem; color: var(--muted); font-variant-numeric:
 .table-wrap-lanes tbody tr { cursor: pointer; }
 .table-wrap-lanes tbody tr:hover td { background: #1a1d26; }
 .table-wrap-lanes tbody tr.is-selected td { background: #1b2433; }
+.table-wrap-lanes button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 table.facts .status { display: inline-flex; align-items: center; gap: 0.4rem; white-space: nowrap; }
 table.facts .actions { display: flex; gap: 0.45rem; align-items: center; flex-wrap: nowrap; }
 table.facts .actions input { width: 12rem; flex: 1 1 10rem; }
@@ -95,6 +96,8 @@ p.lead { color: var(--muted); max-width: 42rem; }
 .graph-hint { color: var(--muted); font-size: 12px; margin-left: auto; }
 .graph-body { display: grid; grid-template-columns: 1fr 16rem; min-height: 560px; }
 .graph-canvas { width: 100%; height: 560px; display: block; background: #0c0d10; touch-action: none; }
+.graph-canvas g[role="button"]:focus { outline: none; }
+.graph-canvas g[role="button"]:focus-visible rect { stroke: #7aa2f7; stroke-width: 2.6; }
 .graph-inspect { padding: 1rem 1.1rem; border-left: 1px solid var(--line); background: var(--panel); }
 .graph-inspect h3 { margin: 0 0 0.5rem; font-size: 0.95rem; font-weight: 500; }
 .graph-legend { display: flex; flex-direction: column; gap: 0.35rem; margin-top: 1.2rem; color: var(--muted); font-size: 12px; }

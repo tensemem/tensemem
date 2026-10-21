@@ -81,6 +81,8 @@ export default function OpsPage() {
           <label className="field">
             <span>Access token</span>
             <input
+              type="password"
+              autoComplete="off"
               value={token}
               onChange={(event) => {
                 setTok(event.target.value);
@@ -98,7 +100,13 @@ export default function OpsPage() {
       <div className="card ops-card" style={{ marginTop: "1rem" }}>
         <label className="field">
           <span>Extractor</span>
-          <select value={llm} onChange={(event) => setLlm(event.target.value)}>
+          <select
+            value={llm}
+            onChange={(event) => {
+              setSaved(false);
+              setLlm(event.target.value);
+            }}
+          >
             {EXTRACTORS.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.label}
@@ -109,7 +117,13 @@ export default function OpsPage() {
         </label>
         <label className="field">
           <span>Search ranking</span>
-          <select value={embedder} onChange={(event) => setEmbedder(event.target.value)}>
+          <select
+            value={embedder}
+            onChange={(event) => {
+              setSaved(false);
+              setEmbedder(event.target.value);
+            }}
+          >
             {SEARCH.map((item) => (
               <option key={item.id} value={item.id}>
                 {item.label}

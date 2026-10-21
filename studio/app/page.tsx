@@ -110,9 +110,12 @@ export default function BoardPage() {
                           disabled={!failed || busy === `retry:${id}`}
                           onClick={async () => {
                             setBusy(`retry:${id}`);
+                            setErr("");
                             try {
                               await api.retryJob(id);
                               await load(user);
+                            } catch (error) {
+                              setErr(error instanceof Error ? error.message : "retry failed");
                             } finally {
                               setBusy(null);
                             }
@@ -125,9 +128,12 @@ export default function BoardPage() {
                           disabled={!failed || busy === `dismiss:${id}`}
                           onClick={async () => {
                             setBusy(`dismiss:${id}`);
+                            setErr("");
                             try {
                               await api.dismissJob(id);
                               await load(user);
+                            } catch (error) {
+                              setErr(error instanceof Error ? error.message : "dismiss failed");
                             } finally {
                               setBusy(null);
                             }

@@ -143,8 +143,11 @@ export default function MemoriesPage() {
                         disabled={busy === `explain:${fact.id}`}
                         onClick={async () => {
                           setBusy(`explain:${fact.id}`);
+                          setErr("");
                           try {
                             setExplain(await api.explain(fact.id));
+                          } catch (error) {
+                            setErr(error instanceof Error ? error.message : "timeline failed");
                           } finally {
                             setBusy(null);
                           }
@@ -170,6 +173,7 @@ export default function MemoriesPage() {
                                 return;
                               }
                               setBusy(`replace:${fact.id}`);
+                              setErr("");
                               try {
                                 await api.correct(fact.id, replacement);
                                 setDrafts((currentDrafts) => {
@@ -178,6 +182,8 @@ export default function MemoriesPage() {
                                   return next;
                                 });
                                 await load(user);
+                              } catch (error) {
+                                setErr(error instanceof Error ? error.message : "replace failed");
                               } finally {
                                 setBusy(null);
                               }

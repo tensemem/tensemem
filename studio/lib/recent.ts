@@ -21,7 +21,11 @@ export function rememberRecent(kind: string, value: string): void {
     return;
   }
   const next = [text, ...recentList(kind).filter((item) => item !== text)].slice(0, 12);
-  localStorage.setItem(PREFIX + kind, JSON.stringify(next));
+  try {
+    localStorage.setItem(PREFIX + kind, JSON.stringify(next));
+  } catch {
+    // Suggestions are optional.
+  }
 }
 
 export function matchesRecent(kind: string, typed: string): string[] {

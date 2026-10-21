@@ -69,7 +69,7 @@ export default function MapPage() {
 
       <h2>Lanes</h2>
       <p className="lead">
-        {rows.length} facts across {lanes} {lanes === 1 ? "lane" : "lanes"}. Click a row to focus that fact on the
+        {rows.length} facts across {lanes} {lanes === 1 ? "lane" : "lanes"}. Select a row to focus that fact on the
         graph.
       </p>
       {rows.length ? (
@@ -83,6 +83,7 @@ export default function MapPage() {
                 <th className="col-status">Status</th>
                 <th className="col-when">Valid from</th>
                 <th className="col-when">Recorded</th>
+                <th className="col-job-actions">Select</th>
               </tr>
             </thead>
             <tbody>
@@ -105,6 +106,15 @@ export default function MapPage() {
                     </td>
                     <td className="col-when">{when(fact.valid_from)}</td>
                     <td className="col-when">{when(fact.recorded_at)}</td>
+                    <td className="col-job-actions">
+                      <button
+                        type="button"
+                        className={selected === nodeId ? "primary" : undefined}
+                        onClick={() => setSelected(nodeId)}
+                      >
+                        {selected === nodeId ? "Selected" : "Select"}
+                      </button>
+                    </td>
                   </tr>
                 );
               })}

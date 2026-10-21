@@ -160,9 +160,16 @@ export function FactGraph({
       }),
     [edges, showPred, showSupersede, visibleIds],
   );
-  const focus = hover ?? selectedId;
+  const visibleSelectedId = selectedId && visibleIds.has(selectedId) ? selectedId : null;
+  const focus = (hover && visibleIds.has(hover) ? hover : null) ?? visibleSelectedId;
   const lit = focus ? neighbors(focus, drawn) : null;
-  const selected = nodes.find((node) => node.id === selectedId) ?? null;
+  const selected = visibleNodes.find((node) => node.id === visibleSelectedId) ?? null;
+
+  useEffect(() => {
+    if (selectedId && !visibleSelectedId) {
+      onSelect(null);
+    }
+  }, [onSelect, selectedId, visibleSelectedId]);
 
   const toWorld = (clientX: number, clientY: number) => {
     const svg = svgRef.current;
@@ -218,7 +225,7 @@ export function FactGraph({
           className="graph-canvas"
           viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
           height={CANVAS_H}
-          role="img"
+          role="group"
           aria-label="Fact graph"
           onPointerDown={(event) => {
             if (event.target !== event.currentTarget) return;
@@ -245,6 +252,9 @@ export function FactGraph({
             });
           }}
           onPointerUp={() => {
+            drag.current = null;
+          }}
+          onPointerCancel={() => {
             drag.current = null;
           }}
         >
@@ -291,7 +301,7 @@ export function FactGraph({
             if (!point) return null;
             const width = NODE_W[node.kind] ?? 150;
             const on = !lit || lit.has(node.id);
-            const picked = selectedId === node.id;
+            const picked = visibleSelectedId === node.id;
             const stroke = node.kind === "fact" ? statusColor(node.status) : picked ? "#7aa2f7" : "#8b8678";
             return (
               <g
@@ -305,8 +315,17 @@ export function FactGraph({
                   onSelect(node.id);
                   event.currentTarget.setPointerCapture(event.pointerId);
                 }}
+                role="button"
+                tabIndex={0}
+                aria-label={`${node.kind}: ${node.label}${node.status ? ` (${node.status})` : ""}`}
                 onPointerEnter={() => setHover(node.id)}
                 onPointerLeave={() => setHover((current) => (current === node.id ? null : current))}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    onSelect(node.id);
+                  }
+                }}
               >
                 <rect
                   x={point.x - width / 2}

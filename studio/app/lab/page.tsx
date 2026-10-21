@@ -10,7 +10,8 @@ export default function LabPage() {
   const [historyOn, setHistoryOn] = useState(false);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [retrieved, setRetrieved] = useState<Record<string, unknown> | null>(null);
-  const [busy, setBusy] = useState<string | null>(null);
+  const [retrieveBusy, setRetrieveBusy] = useState(false);
+  const [compareBusy, setCompareBusy] = useState(false);
   const [err, setErr] = useState("");
 
   return (
@@ -28,10 +29,10 @@ export default function LabPage() {
         </label>
         <button
           type="button"
-          disabled={busy === "retrieve"}
+          disabled={retrieveBusy}
           onClick={async () => {
             setErr("");
-            setBusy("retrieve");
+            setRetrieveBusy(true);
             try {
               const [hits, packed] = await Promise.all([
                 api.search(user, query),
@@ -41,29 +42,29 @@ export default function LabPage() {
             } catch (error) {
               setErr(error instanceof Error ? error.message : "failed");
             } finally {
-              setBusy(null);
+              setRetrieveBusy(false);
             }
           }}
         >
-          {busy === "retrieve" ? "Retrieving…" : "Retrieve"}
+          {retrieveBusy ? "Retrieving…" : "Retrieve"}
         </button>
         <button
           className="primary"
           type="button"
-          disabled={busy === "compare"}
+          disabled={compareBusy}
           onClick={async () => {
             setErr("");
-            setBusy("compare");
+            setCompareBusy(true);
             try {
               setResult(await api.compare(user, query, historyOn));
             } catch (error) {
               setErr(error instanceof Error ? error.message : "failed");
             } finally {
-              setBusy(null);
+              setCompareBusy(false);
             }
           }}
         >
-          {busy === "compare" ? "Comparing…" : "Compare"}
+          {compareBusy ? "Comparing…" : "Compare"}
         </button>
       </div>
       {err ? <p className="err">{err}</p> : null}
