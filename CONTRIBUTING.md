@@ -52,7 +52,7 @@ TENSEMEM_LIVE=1 uv run pytest -m live
 | **Build distributions** | `uv build` + `twine check` (Python path) |
 | **Studio** | `npm ci`, `tsc --noEmit`, `next build` (Studio path) |
 | **PR quality** | Aggregator. Green only when description/size, actionlint, and gitleaks pass |
-| **PR description and size** | Requires `## Issue` (with `#N`) / `## What` / `## Why` / `## Docs`; fails diffs over 1000 lines unless labeled `large-pr` |
+| **PR description and size** | Requires `## Issue` (with `#N`) / `## What` / `## Why` / `## Docs`; Studio UI PRs also need `## UI` with screenshots/video; fails diffs over 1000 lines unless labeled `large-pr` |
 | **CodeQL** | `Analyze (python)` and `Analyze (actions)` |
 | **Publish** | Not a merge gate. On `v*` tags, builds the wheel and uploads to PyPI via trusted publishing |
 | **Live extract** | Not a merge gate. A repo admin comments `/test` to run `pytest -m live` on the default branch only, so unmerged code never sees hosted keys |
@@ -91,12 +91,13 @@ If the issue is already assigned to someone else, pick another issue or ask in a
 1. Title includes exactly one of `[low-risk]`, `[medium-risk]`, `[high-risk]`.
 2. Body includes an **Issue** section that references the GitHub issue (`Fixes #123` or `Refs #123`). Use `Fixes` when merging should close the issue. Titles may include `[no-issue]` only for maintainer work that has no tracking issue.
 3. Add **one** new file `changes/<kebab-slug>.md` (What + Why), unless the title includes `[no-changeset]`.
-4. Significant design choices get an ADR in `docs/adr/` and a row in `docs/adr/README.md`.
-5. User-facing API or CLI changes update the README in the same PR. Do not refresh the README status line for internal-only slices.
-6. Public docs (README, ADRs, CONTRIBUTING, PR body) stay vendor-neutral: describe TenseMem by its properties, not by naming other products.
-7. No secrets, tokens, or database files in the commit.
+4. **Studio / UI PRs** (any change under `studio/`): the body must include before/after **screenshots or a short screen recording** in a **UI** section (drag images into the GitHub PR description, or link a video). Pure config/docs under `studio/` with no visible UI change may use `[no-ui]` in the title.
+5. Significant design choices get an ADR in `docs/adr/` and a row in `docs/adr/README.md`.
+6. User-facing API or CLI changes update the README in the same PR. Do not refresh the README status line for internal-only slices.
+7. Public docs (README, ADRs, CONTRIBUTING, PR body) stay vendor-neutral: describe TenseMem by its properties, not by naming other products.
+8. No secrets, tokens, or database files in the commit.
 
-Body must include **Issue**, **What**, **Why**, and **Docs** (or “none needed” plus one line).
+Body must include **Issue**, **What**, **Why**, and **Docs** (or “none needed” plus one line). Studio UI PRs also need **UI** with media.
 
 ## Commits
 

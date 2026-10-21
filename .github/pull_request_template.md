@@ -25,6 +25,12 @@ Fixes #
 
 -
 
+## UI
+
+<!-- Required when the PR changes studio/ UI. Paste screenshots or a short video (before/after). Use [no-ui] in the title only when studio/ changes have no visible UI (e.g. package.json scripts). -->
+
+-
+
 ## Test plan
 
 - [ ] `uv run ruff check . && uv run ruff format --check .`

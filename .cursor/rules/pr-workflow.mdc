@@ -30,6 +30,7 @@ alwaysApply: true
   - **What** — bullet list of concrete changes
   - **Why** — the problem or decision this addresses
   - **Docs** — what was updated, or "none needed" with a one-line reason
+  - **UI** — screenshots or a short video when `studio/` UI changes (unless the title includes `[no-ui]`)
 - No competitor product names in the PR title or body (see public-docs rule).
 
 ## Commits

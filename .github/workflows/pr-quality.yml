@@ -52,6 +52,41 @@ jobs:
           esac
           exit "$missing"
 
+      - name: Require screenshots for Studio UI changes
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+          TITLE: ${{ github.event.pull_request.title }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          case "$TITLE" in
+            *"[no-ui]"*)
+              echo "Title includes [no-ui]; skipping Studio media check."
+              exit 0
+              ;;
+          esac
+          studio_files=$(git diff --name-only "$BASE_SHA"..."$HEAD_SHA" -- studio/ || true)
+          if [ -z "$studio_files" ]; then
+            echo "No studio/ changes; skipping UI media check."
+            exit 0
+          fi
+          # Visible UI surfaces (skip pure package/config unless they are the only change).
+          ui_files=$(printf '%s\n' "$studio_files" | grep -E '\.(tsx|ts|css|jsx|js)$' || true)
+          if [ -z "$ui_files" ]; then
+            echo "studio/ changed but no UI source files; skipping media check."
+            exit 0
+          fi
+          if ! printf '%s\n' "$BODY" | grep -Fq '## UI'; then
+            echo "::error::Studio UI PRs must include a '## UI' section with screenshots or a short video (see CONTRIBUTING.md). Use [no-ui] in the title only when there is no visible UI change."
+            exit 1
+          fi
+          if ! printf '%s\n' "$BODY" | grep -Eqi '!\[|https?://[^ ]+\.(png|jpe?g|gif|webp|mp4|webm|mov)|user-images\.githubusercontent\.com|github\.com/user-attachments/'; then
+            echo "::error::Studio UI PRs must attach or link a screenshot/video in the ## UI section (drag images into the PR description on GitHub)."
+            exit 1
+          fi
+          echo "Studio UI media check passed."
+
       - name: Enforce small diffs
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
