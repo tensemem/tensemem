@@ -21,7 +21,7 @@ uv sync --extra server --extra mcp
 
 ## Checks
 
-Run these from the repo root before you push. CI runs the same set.
+Run these from the repo root before you push. CI runs the same set for the paths you touch.
 
 ```bash
 uv run ruff check .
@@ -29,6 +29,12 @@ uv run ruff format --check .
 uv run pyright
 uv run pytest
 uvx codespell --skip="*.lock,.git,uv.lock" --ignore-words-list="tensemem"
+```
+
+Studio (when you change `studio/`):
+
+```bash
+cd studio && npm ci && npm run typecheck && npm run build
 ```
 
 Default pytest never calls a model. After `uv sync --extra openai`:
@@ -39,16 +45,19 @@ TENSEMEM_LIVE=1 uv run pytest -m live
 
 | Check | What it does |
 |---|---|
-| **CI** | Aggregator. Green only when lint, the full OS/Python test matrix, and the package build all pass |
-| **Lint and type-check** | Ruff, format, pyright, codespell |
-| **Test (`os`, Python `x`)** | `pytest` on Ubuntu / macOS / Windows × 3.11–3.15 |
-| **Build distributions** | `uv build` + `twine check` |
+| **CI** | Aggregator. Green when every *needed* job passes; skipped path jobs do not fail the gate |
+| **Detect paths** | On pull requests: Python jobs if `src/`, `tests/`, package metadata, or CI/publish workflows change; Studio jobs if `studio/` (or CI) changes. Pushes to `main` run both |
+| **Lint and type-check** | Ruff, format, pyright, codespell (Python path) |
+| **Test (`os`, Python `x`)** | `pytest` on Ubuntu / macOS / Windows × 3.11–3.15 (Python path) |
+| **Build distributions** | `uv build` + `twine check` (Python path) |
+| **Studio** | `npm ci`, `tsc --noEmit`, `next build` (Studio path) |
 | **PR quality** | Aggregator. Green only when description/size, actionlint, and gitleaks pass |
 | **PR description and size** | Requires `## What` / `## Why` / `## Docs`; fails diffs over 1000 lines unless labeled `large-pr` |
 | **CodeQL** | `Analyze (python)` and `Analyze (actions)` |
+| **Publish** | Not a merge gate. On `v*` tags, builds the wheel and uploads to PyPI via trusted publishing |
 | **Live extract** | Not a merge gate. A repo admin comments `/test` to run `pytest -m live` on the default branch only, so unmerged code never sees hosted keys |
 
-`main` cannot merge while any required check is red or pending. Required checks are **CI**, **PR quality**, **Analyze (python)**, and **Analyze (actions)**. Admins are not exempt. Force-pushes and deleting `main` stay blocked. Live extract is optional and must stay that way.
+`main` cannot merge while any required check is red or pending. Required checks are **CI**, **PR quality**, **Analyze (python)**, and **Analyze (actions)**. Admins are not exempt. Force-pushes and deleting `main` stay blocked. Live extract and Publish are optional and must stay that way.
 
 ## Studio and serve
 
@@ -81,6 +90,24 @@ Body must include **What**, **Why**, and **Docs** (or “none needed” plus one
 ## Commits
 
 Imperative mood (`Add freshness fields to context reads`). Group related changes. No `--no-verify`.
+
+## Releasing to PyPI
+
+Version lives in `src/tensemem/__init__.py` (`__version__`). Update `CHANGELOG.md` in the same PR as the version bump when you cut a release.
+
+1. On [PyPI](https://pypi.org/manage/project/tensemem/settings/publishing/), add a **trusted publisher** for this GitHub repo: workflow `publish.yml`, environment `pypi`. No API token in GitHub secrets.
+2. In this repo, create a GitHub Environment named `pypi` (optional protection rules for who can push tags).
+3. Merge the release PR to `main`, then tag and push (tag must match `__version__` exactly, with a `v` prefix):
+
+```bash
+git checkout main && git pull
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+4. The **Publish** workflow builds, runs `twine check`, and uploads with OIDC. Create a GitHub Release from that tag and paste the matching `CHANGELOG.md` section.
+
+Do not store a PyPI password or API token in the repository.
 
 ## Public surface
 
