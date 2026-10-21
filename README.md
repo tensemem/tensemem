@@ -145,6 +145,50 @@ Gemini extract uses `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) in the environment of
 
 `uvx mkdocs serve` previews the same pages locally.
 
+## Testing
+
+Default tests need no API keys and never call a model. From a git checkout:
+
+```bash
+git clone https://github.com/tensemem/tensemem.git
+cd tensemem
+uv sync
+uv run ruff check .
+uv run ruff format --check .
+uv run pyright
+uv run pytest
+```
+
+Studio (optional, when you change `studio/`):
+
+```bash
+cd studio && npm ci && npm run typecheck && npm run build
+```
+
+Live extract against a real model (skipped unless both are set):
+
+```bash
+uv sync --extra openai
+TENSEMEM_LIVE=1 OPENAI_API_KEY=… uv run pytest -m live
+```
+
+## Environment variables
+
+Model keys belong in the process that runs extract (your script, or the `tensemem serve` terminal). They are never valid values for Studio **Token**.
+
+| Variable | Used for |
+|---|---|
+| `GEMINI_API_KEY` or `GOOGLE_API_KEY` | Gemini extract |
+| `OPENAI_API_KEY` | OpenAI extract / embeddings (`tensemem[openai]`) |
+| `ANTHROPIC_API_KEY` | Anthropic extract (`tensemem[anthropic]`) |
+| `TENSEMEM_LLM` | Default extractor name for `tensemem serve` (`fake`, `gemini`, `openai`, …) |
+| `TENSEMEM_LITELLM_MODEL` | Override Gemini / LiteLLM model id |
+| `TENSEMEM_TOKEN` | Optional bearer for `tensemem serve` / `tensemem mcp --http` (not a model key) |
+| `TENSEMEM_URL` | Studio rewrite target (default `http://127.0.0.1:8080`) |
+| `TENSEMEM_LIVE` | Set to `1` with `OPENAI_API_KEY` to run `pytest -m live` |
+
+Ollama needs a local Ollama process, not an env key. Details: [Studio](docs/studio.md), [REST](docs/server.md), [SECURITY.md](SECURITY.md).
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). `main` is protected; every change is a pull request. Merges wait until **CI**, **PR quality**, and CodeQL are green.
