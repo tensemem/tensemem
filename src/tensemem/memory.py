@@ -54,7 +54,7 @@ from tensemem.providers.embed.base import Embedder
 from tensemem.providers.llm.base import LLMProvider
 from tensemem.security.fence import strip as strip_fences
 from tensemem.security.fence import wrap as wrap_fence
-from tensemem.storage.base import StorageBackend
+from tensemem.storage.base import SqliteBackend
 from tensemem.storage.sqlite import SqliteDatabase
 from tensemem.storage.sqlite.embeddings import enqueue_fact_embeds
 from tensemem.storage.sqlite.entities import (
@@ -120,10 +120,10 @@ class Memory:
         batch_size: int = EXTRACT_BATCH,
         start_worker: bool = True,
         hooks: Sequence[Hook] | None = None,
-        store: StorageBackend | None = None,
+        store: SqliteBackend | None = None,
     ) -> None:
         self._owns_store = store is None
-        self._db: StorageBackend = store if store is not None else SqliteDatabase(path, clock=clock)
+        self._db: SqliteBackend = store if store is not None else SqliteDatabase(path, clock=clock)
         self._llm = llm
         self._embedder = embedder
         self._batch_size = batch_size
@@ -155,7 +155,7 @@ class Memory:
         worker = self._worker
         return worker is not None and worker.is_alive()
 
-    def store(self) -> StorageBackend:
+    def store(self) -> SqliteBackend:
         """Underlying store. Studio ops use this for keys and settings."""
         return self._db
 
@@ -1167,7 +1167,7 @@ class AsyncMemory:
         embedder: Embedder | None = None,
         batch_size: int = EXTRACT_BATCH,
         hooks: Sequence[Hook] | None = None,
-        store: StorageBackend | None = None,
+        store: SqliteBackend | None = None,
     ) -> None:
         self._sync = Memory(
             path,

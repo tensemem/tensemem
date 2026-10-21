@@ -32,7 +32,8 @@ _TABLE_LOCK_SLEEP = 0.01
 class SqliteDatabase:
     """Owns the write connection and a pool of read-only connections.
 
-    Implements :class:`~tensemem.storage.base.StorageBackend`.
+    Implements :class:`~tensemem.storage.base.StorageBackend` and
+    :class:`~tensemem.storage.base.SqliteBackend`.
     """
 
     def __init__(

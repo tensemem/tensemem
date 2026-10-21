@@ -8,7 +8,7 @@ from typing import Any, Protocol, TypeVar
 from pydantic import BaseModel
 
 from tensemem.providers.llm.base import LLMProvider, prompt_key
-from tensemem.storage.base import StorageBackend
+from tensemem.storage.sqlite.database import SqliteDatabase
 from tensemem.storage.sqlite.llm_cache import get_cached, put_cached
 
 T = TypeVar("T", bound=BaseModel)
@@ -32,7 +32,7 @@ class MemoryCache:
 
 
 class SqliteCache:
-    def __init__(self, db: StorageBackend) -> None:
+    def __init__(self, db: SqliteDatabase) -> None:
         self._db = db
 
     def get(self, key: str) -> str | None:

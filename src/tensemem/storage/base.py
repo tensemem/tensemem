@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Protocol, Self, TypeVar, runtime_checkable
@@ -13,7 +14,7 @@ T = TypeVar("T")
 
 @runtime_checkable
 class StorageBackend(Protocol):
-    """Store lifecycle. Work units are backend-private (SQLite uses a connection)."""
+    """Store lifecycle. Work-unit type is backend-private."""
 
     def now(self) -> str:
         """Current time from the store clock, formatted for storage."""
@@ -42,6 +43,33 @@ class StorageBackend(Protocol):
     def close(self) -> None:
         """Release writer and reader resources. Idempotent."""
         ...
+
+    def __enter__(self) -> Self: ...
+
+    def __exit__(self, *exc: object) -> None: ...
+
+
+@runtime_checkable
+class SqliteBackend(Protocol):
+    """``StorageBackend`` whose work units are ``sqlite3.Connection``.
+
+    ``Memory.store=`` and the extract worker require this until repositories
+    stop taking a connection.
+    """
+
+    def now(self) -> str: ...
+
+    def write(self, fn: Callable[[sqlite3.Connection], T]) -> T: ...
+
+    def transaction(self, fn: Callable[[sqlite3.Connection], T]) -> T: ...
+
+    def read(self, fn: Callable[[sqlite3.Connection], T]) -> T: ...
+
+    def seed(self, ontology: Ontology) -> None: ...
+
+    def backup_to(self, dest: str | Path) -> None: ...
+
+    def close(self) -> None: ...
 
     def __enter__(self) -> Self: ...
 

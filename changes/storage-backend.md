@@ -1,8 +1,8 @@
 # What
 
-- Add a `StorageBackend` protocol for store lifecycle (`now`, `write`, `transaction`, `read`, `seed`, `backup_to`, `close`).
-- `Memory` / `AsyncMemory` accept `store=` (default remains on-disk SQLite). An injected store is not closed by `Memory.close()`.
-- Conformance tests run that lifecycle against `SqliteDatabase` so a later backend can register the same factory.
+- Add a `StorageBackend` protocol for store lifecycle and a `SqliteBackend` whose work units are `sqlite3.Connection`.
+- `Memory` / `AsyncMemory` accept `store=` as a `SqliteBackend` (default remains on-disk SQLite). An injected store is not closed by `Memory.close()`.
+- Conformance tests run that lifecycle against `SqliteDatabase` so a later SQLite-shaped backend can register the same factory.
 
 # Why
 

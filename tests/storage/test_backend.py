@@ -1,4 +1,4 @@
-"""Conformance for StorageBackend. Register another factory when a second store lands."""
+"""Conformance for SqliteBackend. Register another SQLite-shaped factory later."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from tensemem import Memory
 from tensemem.core.clock import FrozenClock, format_instant
 from tensemem.core.models import PredicateSpec
 from tensemem.core.ontology import Ontology
-from tensemem.storage import SqliteDatabase, StorageBackend
+from tensemem.storage import SqliteBackend, SqliteDatabase, StorageBackend
 
 
 class BackendFactory(Protocol):
@@ -21,7 +21,7 @@ class BackendFactory(Protocol):
         path: str | Path = ":memory:",
         *,
         clock: FrozenClock | None = None,
-    ) -> StorageBackend: ...
+    ) -> SqliteBackend: ...
 
 
 def sqlite_backend(
@@ -47,6 +47,7 @@ def backend_factory(request: pytest.FixtureRequest) -> BackendFactory:
 def test_sqlite_satisfies_storage_backend() -> None:
     with sqlite_backend() as db:
         assert isinstance(db, StorageBackend)
+        assert isinstance(db, SqliteBackend)
 
 
 def test_now_uses_store_clock(backend_factory: BackendFactory) -> None:
