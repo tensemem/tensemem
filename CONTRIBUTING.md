@@ -52,7 +52,7 @@ TENSEMEM_LIVE=1 uv run pytest -m live
 | **Build distributions** | `uv build` + `twine check` (Python path) |
 | **Studio** | `npm ci`, `tsc --noEmit`, `next build` (Studio path) |
 | **PR quality** | Aggregator. Green only when description/size, actionlint, and gitleaks pass |
-| **PR description and size** | Requires `## What` / `## Why` / `## Docs`; fails diffs over 1000 lines unless labeled `large-pr` |
+| **PR description and size** | Requires `## Issue` (with `#N`) / `## What` / `## Why` / `## Docs`; fails diffs over 1000 lines unless labeled `large-pr` |
 | **CodeQL** | `Analyze (python)` and `Analyze (actions)` |
 | **Publish** | Not a merge gate. On `v*` tags, builds the wheel and uploads to PyPI via trusted publishing |
 | **Live extract** | Not a merge gate. A repo admin comments `/test` to run `pytest -m live` on the default branch only, so unmerged code never sees hosted keys |
@@ -74,18 +74,29 @@ Hosted extract (Gemini, OpenAI, …) reads keys from **that serve process enviro
 
 Do not commit `*.db`, `*.db-wal`, `*.db-shm`, Studio `node_modules`, or `.next`.
 
+## Picking an issue
+
+Do **not** open a pull request for an open issue until a maintainer has **assigned that issue to you**.
+
+1. Comment on the issue that you want to work on it (one or two sentences is enough).
+2. Wait until you are listed as the assignee.
+3. Then branch, implement, and open the PR.
+
+If the issue is already assigned to someone else, pick another issue or ask in a comment whether they are still working on it. Unsolicited PRs that skip assignment may be closed so two people do not duplicate the same work. Maintainers may still open unsolicited fix PRs; those titles use `[no-issue]`.
+
 ## Pull requests
 
 `main` is protected and cannot merge while required checks are red or pending. One concern per PR.
 
 1. Title includes exactly one of `[low-risk]`, `[medium-risk]`, `[high-risk]`.
-2. Add **one** new file `changes/<kebab-slug>.md` (What + Why), unless the title includes `[no-changeset]`.
-3. Significant design choices get an ADR in `docs/adr/` and a row in `docs/adr/README.md`.
-4. User-facing API or CLI changes update the README in the same PR. Do not refresh the README status line for internal-only slices.
-5. Public docs (README, ADRs, CONTRIBUTING, PR body) stay vendor-neutral: describe TenseMem by its properties, not by naming other products.
-6. No secrets, tokens, or database files in the commit.
+2. Body includes an **Issue** section that references the GitHub issue (`Fixes #123` or `Refs #123`). Use `Fixes` when merging should close the issue. Titles may include `[no-issue]` only for maintainer work that has no tracking issue.
+3. Add **one** new file `changes/<kebab-slug>.md` (What + Why), unless the title includes `[no-changeset]`.
+4. Significant design choices get an ADR in `docs/adr/` and a row in `docs/adr/README.md`.
+5. User-facing API or CLI changes update the README in the same PR. Do not refresh the README status line for internal-only slices.
+6. Public docs (README, ADRs, CONTRIBUTING, PR body) stay vendor-neutral: describe TenseMem by its properties, not by naming other products.
+7. No secrets, tokens, or database files in the commit.
 
-Body must include **What**, **Why**, and **Docs** (or “none needed” plus one line).
+Body must include **Issue**, **What**, **Why**, and **Docs** (or “none needed” plus one line).
 
 ## Commits
 
