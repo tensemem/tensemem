@@ -8,6 +8,7 @@
 
 - [Quickstart](quickstart.md) — three lines to a fenced `context()` block
 - [Concepts](concepts.md) — episodes, facts, freshness, fences, corrections
+- [Architecture](architecture.md) — surfaces, write / extract / read paths, and where to change things
 - [Python API](api.md) — `Memory` and `AsyncMemory`
 - [CLI](cli.md) — inspect, history, explain, search, jobs, bench, longmem, locomo, latency, mcp, serve
 - [MCP](mcp.md) — stdio or Streamable HTTP tools for remember / recall / state / history / forget

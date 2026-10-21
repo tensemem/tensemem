@@ -1,0 +1,150 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1088" role="img" aria-labelledby="title desc">
+  <title id="title">TenseMem architecture</title>
+  <desc id="desc">Surfaces call Memory. Writes append episodes. An extract worker turns messages into typed ops. resolve() decides mutations. apply() writes one SQLite file. Reads return fenced context plus freshness.</desc>
+  <rect width="1200" height="1088" fill="#f8fafc"/>
+  <text x="32" y="40" font-family="ui-sans-serif, system-ui, sans-serif" font-size="22" font-weight="700" fill="#0f172a">TenseMem architecture</text>
+  <text x="32" y="64" font-family="ui-sans-serif, system-ui, sans-serif" font-size="13" fill="#334155">Same Memory API on every surface. The model proposes typed ops. Deterministic code applies them. Facts are a rebuildable projection of an append-only episode log.</text>
+
+  <!-- Surfaces -->
+  <rect x="20" y="84" width="1160" height="118" rx="10" fill="#eff6ff" stroke="#1d4ed8" stroke-width="1.5"/>
+  <text x="36" y="106" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="700" fill="#1e3a8a">SURFACES  every caller is an adapter over Memory / AsyncMemory</text>
+  <g font-family="ui-sans-serif, system-ui, sans-serif" text-anchor="middle">
+    <rect x="36" y="118" width="150" height="68" rx="8" fill="#fff" stroke="#1d4ed8"/>
+    <text x="111" y="146" font-size="13" font-weight="700" fill="#0f172a">Python SDK</text>
+    <text x="111" y="166" font-size="10" fill="#334155">memory.py</text>
+    <rect x="198" y="118" width="150" height="68" rx="8" fill="#fff" stroke="#1d4ed8"/>
+    <text x="273" y="146" font-size="13" font-weight="700" fill="#0f172a">CLI</text>
+    <text x="273" y="166" font-size="10" fill="#334155">cli/main.py</text>
+    <rect x="360" y="118" width="150" height="68" rx="8" fill="#fff" stroke="#1d4ed8"/>
+    <text x="435" y="146" font-size="13" font-weight="700" fill="#0f172a">REST /v1</text>
+    <text x="435" y="166" font-size="10" fill="#334155">server.py</text>
+    <rect x="522" y="118" width="150" height="68" rx="8" fill="#fff" stroke="#1d4ed8"/>
+    <text x="597" y="146" font-size="13" font-weight="700" fill="#0f172a">Studio</text>
+    <text x="597" y="166" font-size="10" fill="#334155">studio/ ’ /v1</text>
+    <rect x="684" y="118" width="150" height="68" rx="8" fill="#fff" stroke="#1d4ed8"/>
+    <text x="759" y="146" font-size="13" font-weight="700" fill="#0f172a">MCP</text>
+    <text x="759" y="166" font-size="10" fill="#334155">mcp.py</text>
+    <rect x="846" y="118" width="150" height="68" rx="8" fill="#fff" stroke="#1d4ed8"/>
+    <text x="921" y="146" font-size="13" font-weight="700" fill="#0f172a">LangGraph</text>
+    <text x="921" y="166" font-size="10" fill="#334155">langgraph.py</text>
+    <rect x="1008" y="118" width="156" height="68" rx="8" fill="#fff" stroke="#1d4ed8"/>
+    <text x="1086" y="146" font-size="13" font-weight="700" fill="#0f172a">LlamaIndex</text>
+    <text x="1086" y="166" font-size="10" fill="#334155">llamaindex.py</text>
+  </g>
+
+  <line x1="600" y1="202" x2="600" y2="226" stroke="#0f172a" stroke-width="1.5"/>
+  <polygon points="600,232 595,222 605,222" fill="#0f172a"/>
+
+  <rect x="380" y="234" width="440" height="48" rx="8" fill="#0f172a"/>
+  <text x="600" y="256" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="14" font-weight="700" fill="#fff">Memory / AsyncMemory</text>
+  <text x="600" y="274" text-anchor="middle" font-family="ui-sans-serif, system-ui, sans-serif" font-size="10" fill="#cbd5e1">src/tensemem/memory.py  one API, one SQLite file, optional extract worker</text>
+
+  <line x1="200" y1="282" x2="200" y2="308" stroke="#0f172a" stroke-width="1.5"/>
+  <line x1="200" y1="282" x2="1000" y2="282" stroke="#0f172a" stroke-width="1.5"/>
+  <line x1="600" y1="282" x2="600" y2="308" stroke="#0f172a" stroke-width="1.5"/>
+  <line x1="1000" y1="282" x2="1000" y2="308" stroke="#0f172a" stroke-width="1.5"/>
+  <polygon points="200,314 195,304 205,304" fill="#0f172a"/>
+  <polygon points="600,314 595,304 605,304" fill="#0f172a"/>
+  <polygon points="1000,314 995,304 1005,304" fill="#0f172a"/>
+
+  <!-- Write -->
+  <rect x="20" y="320" width="360" height="348" rx="10" fill="#ecfdf5" stroke="#047857" stroke-width="1.5"/>
+  <text x="36" y="344" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="700" fill="#064e3b">WRITE  append first, never edit the log</text>
+  <g font-family="ui-sans-serif, system-ui, sans-serif" fill="#0f172a">
+    <text x="36" y="372" font-size="12" font-weight="600">add(user, text)</text>
+    <text x="36" y="390" font-size="11" fill="#334155">episode + EXTRACT job, one transaction</text>
+    <text x="36" y="418" font-size="12" font-weight="600">set / add_value / retract</text>
+    <text x="36" y="436" font-size="11" fill="#334155">explicit_op episode ’ same resolve()</text>
+    <text x="36" y="464" font-size="12" font-weight="600">correct(fact_id [, replacement])</text>
+    <text x="36" y="482" font-size="11" fill="#334155">DENY without text; SET if a replacement is given</text>
+    <text x="36" y="500" font-size="11" fill="#334155">restores the displaced value; survives rebuild()</text>
+    <text x="36" y="528" font-size="12" font-weight="600">forget(user) / wipe</text>
+    <text x="36" y="546" font-size="11" fill="#334155">erasure tombstone  the only log delete</text>
+    <text x="36" y="574" font-size="12" font-weight="600">register_predicate(name, ONE|MANY)</text>
+    <text x="36" y="592" font-size="11" fill="#334155">cardinality is enforced in resolve() and SQLite</text>
+    <text x="36" y="620" font-size="12" font-weight="600">rebuild()</text>
+    <text x="36" y="638" font-size="11" fill="#334155">replay episodes through the current pipeline</text>
+  </g>
+
+  <!-- Extract -->
+  <rect x="400" y="320" width="400" height="348" rx="10" fill="#f0fdfa" stroke="#0f766e" stroke-width="1.5"/>
+  <text x="416" y="344" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="700" fill="#115e59">EXTRACT WORKER  pipeline/worker.py</text>
+  <g font-family="ui-sans-serif, system-ui, sans-serif" fill="#0f172a">
+    <text x="416" y="370" font-size="12" font-weight="600">jobs: QUEUED ’ LEASED ’ DONE | DEAD</text>
+    <text x="416" y="388" font-size="11" fill="#334155">60s lease; same-scope extract shares one LLM call</text>
+    <text x="416" y="416" font-size="12">1. strip fence + scrub secrets</text>
+    <text x="416" y="434" font-size="11" fill="#334155">security/fence.py · security/scrub.py</text>
+    <text x="416" y="458" font-size="12">2. extract() via LLMProvider</text>
+    <text x="416" y="476" font-size="11" fill="#334155">pipeline/extractor.py · prompts/extract_v1.md</text>
+    <text x="416" y="500" font-size="12">3. keep_ops  evidence is a verbatim quote</text>
+    <text x="416" y="524" font-size="12">4. normalize_ops  unknown predicates dropped</text>
+    <text x="416" y="542" font-size="11" fill="#334155">unless the model sent new_predicate</text>
+    <text x="416" y="566" font-size="12">5. apply_policy  hedges, dates, planned</text>
+    <text x="416" y="590" font-size="12">6. resolve(snapshot, ops) ’ mutations</text>
+    <text x="416" y="608" font-size="11" fill="#334155">pure function · core/resolver.py · ADR 0002</text>
+    <text x="416" y="632" font-size="12">7. apply() in one write transaction</text>
+    <text x="416" y="650" font-size="11" fill="#334155">storage/sqlite/facts.py · fact_events for explain()</text>
+  </g>
+
+  <!-- Read -->
+  <rect x="820" y="320" width="360" height="348" rx="10" fill="#faf5ff" stroke="#6d28d9" stroke-width="1.5"/>
+  <text x="836" y="344" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="700" fill="#4c1d95">READ  always report freshness</text>
+  <g font-family="ui-sans-serif, system-ui, sans-serif" fill="#0f172a">
+    <text x="836" y="372" font-size="12" font-weight="600">state(user)</text>
+    <text x="836" y="390" font-size="11" fill="#334155">current ACTIVE values per predicate</text>
+    <text x="836" y="418" font-size="12" font-weight="600">history(user, predicate)</text>
+    <text x="836" y="436" font-size="11" fill="#334155">ACTIVE · SUPERSEDED · REJECTED</text>
+    <text x="836" y="464" font-size="12" font-weight="600">context(user, min_seq, wait)</text>
+    <text x="836" y="482" font-size="11" fill="#334155">fenced block + hot buffer of pending text</text>
+    <text x="836" y="500" font-size="11" fill="#334155">freshness: as_of_seq, pending, is_current</text>
+    <text x="836" y="528" font-size="12" font-weight="600">search(user, query)</text>
+    <text x="836" y="546" font-size="11" fill="#334155">FTS default; optional embeddings</text>
+    <text x="836" y="574" font-size="12" font-weight="600">explain(fact_id)</text>
+    <text x="836" y="592" font-size="11" fill="#334155">fact_events: why resolve() chose this</text>
+    <text x="836" y="620" font-size="12" font-weight="600">Fence on the way out</text>
+    <text x="836" y="638" font-size="11" fill="#334155">stripped before the next extract (ADR 0007)</text>
+  </g>
+
+  <line x1="200" y1="668" x2="200" y2="688" stroke="#0f172a" stroke-width="1.5"/>
+  <line x1="200" y1="688" x2="1000" y2="688" stroke="#0f172a" stroke-width="1.5"/>
+  <line x1="600" y1="668" x2="600" y2="688" stroke="#0f172a" stroke-width="1.5"/>
+  <line x1="1000" y1="668" x2="1000" y2="688" stroke="#0f172a" stroke-width="1.5"/>
+  <line x1="600" y1="688" x2="600" y2="706" stroke="#0f172a" stroke-width="1.5"/>
+  <polygon points="600,712 595,702 605,702" fill="#0f172a"/>
+
+  <!-- Store -->
+  <rect x="20" y="718" width="1160" height="88" rx="10" fill="#fff7ed" stroke="#c2410c" stroke-width="1.5"/>
+  <text x="36" y="742" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="700" fill="#7c2d12">STORE  one SQLite file (WAL, single writer) · storage/sqlite/ · ADR 0003 / 0020</text>
+  <g font-family="ui-sans-serif, system-ui, sans-serif" text-anchor="middle">
+    <rect x="36" y="754" width="170" height="38" rx="6" fill="#fff" stroke="#c2410c"/>
+    <text x="121" y="778" font-size="12" fill="#0f172a">episodes</text>
+    <rect x="218" y="754" width="170" height="38" rx="6" fill="#fff" stroke="#c2410c"/>
+    <text x="303" y="778" font-size="12" fill="#0f172a">facts</text>
+    <rect x="400" y="754" width="170" height="38" rx="6" fill="#fff" stroke="#c2410c"/>
+    <text x="485" y="778" font-size="12" fill="#0f172a">jobs</text>
+    <rect x="582" y="754" width="170" height="38" rx="6" fill="#fff" stroke="#c2410c"/>
+    <text x="667" y="778" font-size="12" fill="#0f172a">registry</text>
+    <rect x="764" y="754" width="190" height="38" rx="6" fill="#fff" stroke="#c2410c"/>
+    <text x="859" y="778" font-size="12" fill="#0f172a">embeddings (opt.)</text>
+    <rect x="966" y="754" width="198" height="38" rx="6" fill="#fff" stroke="#c2410c"/>
+    <text x="1065" y="778" font-size="12" fill="#0f172a">fact_events</text>
+  </g>
+
+  <!-- Providers -->
+  <rect x="20" y="822" width="1160" height="72" rx="10" fill="#f5f3ff" stroke="#6d28d9" stroke-width="1.5"/>
+  <text x="36" y="846" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="700" fill="#4c1d95">PROVIDERS  keys stay in the process environment, never in Studio Token</text>
+  <text x="36" y="868" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#0f172a">LLM: FakeExtractor (default, no network) · Gemini (GEMINI_API_KEY) · OpenAI · Anthropic · Ollama · LiteLLM</text>
+  <text x="36" y="886" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#0f172a">Embed: off ’ FTS · FastEmbed (tensemem[local]) · OpenAI   ·   Auth on HTTP: TENSEMEM_TOKEN or issued tm_& ops key</text>
+
+  <!-- Invariants -->
+  <rect x="20" y="910" width="1160" height="158" rx="10" fill="#fff" stroke="#334155" stroke-width="1.5"/>
+  <text x="36" y="934" font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" font-weight="700" fill="#0f172a">INVARIANTS contributors must not break</text>
+  <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="12" fill="#0f172a">
+    <text x="36" y="958">" ONE slot ’ at most one ACTIVE fact (resolver + partial unique index).</text>
+    <text x="36" y="978">" resolve() is pure: no I/O. apply() writes. Tests in tests/core and tests/property lock this.</text>
+    <text x="36" y="998">" Extract ops without a verbatim quote of user text are dropped (keep_ops). Recalled context is fenced.</text>
+    <text x="36" y="1018">" Unknown predicates are dropped unless new_predicate is set. Do not auto-register from free text.</text>
+    <text x="36" y="1038">" correct() is durable: rebuild() must not reintroduce a rejected claim from earlier episodes.</text>
+    <text x="36" y="1058">" Default pytest never calls a hosted model. Live extract is /test on the default branch only.</text>
+  </g>
+</svg>

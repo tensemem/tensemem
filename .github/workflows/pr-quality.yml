@@ -106,3 +106,19 @@ jobs:
           gitleaks version
       - name: Scan for secrets
         run: gitleaks detect --source . --verbose --redact
+
+  required:
+    name: PR quality
+    if: always()
+    needs: [description, actionlint, secrets]
+    runs-on: ubuntu-latest
+    steps:
+      - name: All PR quality jobs passed
+        run: |
+          set -euo pipefail
+          echo "description=${{ needs.description.result }}"
+          echo "actionlint=${{ needs.actionlint.result }}"
+          echo "secrets=${{ needs.secrets.result }}"
+          test "${{ needs.description.result }}" = success
+          test "${{ needs.actionlint.result }}" = success
+          test "${{ needs.secrets.result }}" = success

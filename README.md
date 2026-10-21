@@ -59,6 +59,27 @@ flowchart LR
   C -.->|fence stripped| X
 ```
 
+## Architecture
+
+Every surface is an adapter over `Memory` / `AsyncMemory`. The model proposes typed ops; `resolve()` decides mutations; `apply()` writes one SQLite file. Facts are a rebuildable projection of an append-only episode log.
+
+![TenseMem architecture: surfaces, write path, extract worker, read path, SQLite store, and providers](docs/architecture.svg)
+
+Editable source: [docs/architecture.excalidraw](docs/architecture.excalidraw) (open in [Excalidraw](https://excalidraw.com) or the VS Code extension, then export SVG over that file). File map: [Architecture](docs/architecture.md).
+
+| If you are changing… | Start here |
+|---|---|
+| Python / CLI / REST / MCP API | `src/tensemem/memory.py`, `cli/main.py`, `server.py`, `mcp.py` |
+| Studio UI | `studio/app/` (board, memories, playground, echo, ops) and `studio/lib/api.ts` |
+| Extract prompt or worker | `pipeline/prompts/extract_v1.md`, `pipeline/worker.py`, `pipeline/extractor.py` |
+| What an op is allowed to do | `core/resolver.py` (pure), `pipeline/normalize.py`, `pipeline/policy.py`, `pipeline/guard.py` |
+| A new LLM or embedder | `providers/llm/`, `providers/embed/` — keys in process env only |
+| SQLite schema or reads | `storage/sqlite/` (one writer; ADR 0003 / 0020) |
+| Freshness, fence, corrections | `storage/sqlite/snapshot.py`, `security/fence.py`, `correct()` |
+| Invariants | `tests/core/`, `tests/property/`, `tests/golden/` — default pytest never calls a hosted model |
+
+Do not auto-register unknown predicates, skip `keep_ops`, or teach the engine from fenced `context()` text. Those are locked by tests.
+
 ## Safe to act (TenseBench)
 
 `tensemem bench` scores the packaged 101 conversations with `FakeExtractor` (no network):
@@ -109,13 +130,13 @@ Gemini extract uses `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) in the environment of
 
 ## Docs
 
-[Quickstart](docs/quickstart.md) · [Concepts](docs/concepts.md) · [API](docs/api.md) · [CLI](docs/cli.md) · [REST](docs/server.md) · [Studio](docs/studio.md) · [MCP](docs/mcp.md) · [Operations](docs/ops.md) · [ADRs](docs/adr/)
+[Quickstart](docs/quickstart.md) · [Concepts](docs/concepts.md) · [Architecture](docs/architecture.md) · [API](docs/api.md) · [CLI](docs/cli.md) · [REST](docs/server.md) · [Studio](docs/studio.md) · [MCP](docs/mcp.md) · [Operations](docs/ops.md) · [ADRs](docs/adr/)
 
 `uvx mkdocs serve` previews the same pages locally.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md). `main` is protected; every change is a pull request.
+See [CONTRIBUTING.md](CONTRIBUTING.md). `main` is protected; every change is a pull request. Merges wait until **CI**, **PR quality**, and CodeQL are green.
 
 ## License
 

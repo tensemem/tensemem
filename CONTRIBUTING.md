@@ -1,5 +1,7 @@
 # Contributing to TenseMem
 
+Read [Architecture](docs/architecture.md) before you pick a file. The picture in the README is the same map: surfaces → `Memory` → write / extract / read → one SQLite file.
+
 ## Setup
 
 TenseMem uses [uv](https://docs.astral.sh/uv/).
@@ -37,12 +39,16 @@ TENSEMEM_LIVE=1 uv run pytest -m live
 
 | Check | What it does |
 |---|---|
-| **CI** | Ruff, format, pyright, pytest, package build |
-| **PR quality** | Requires `## What` / `## Why` / `## Docs`; fails diffs over 1000 lines unless labeled `large-pr`; actionlint; gitleaks |
-| **CodeQL** | Python and Actions |
-| **Live extract** | Not on every PR. A repo admin comments `/test` to run `pytest -m live` on the default branch only, so unmerged code never sees `OPENAI_API_KEY`. |
+| **CI** | Aggregator. Green only when lint, the full OS/Python test matrix, and the package build all pass |
+| **Lint and type-check** | Ruff, format, pyright, codespell |
+| **Test (`os`, Python `x`)** | `pytest` on Ubuntu / macOS / Windows × 3.11–3.15 |
+| **Build distributions** | `uv build` + `twine check` |
+| **PR quality** | Aggregator. Green only when description/size, actionlint, and gitleaks pass |
+| **PR description and size** | Requires `## What` / `## Why` / `## Docs`; fails diffs over 1000 lines unless labeled `large-pr` |
+| **CodeQL** | `Analyze (python)` and `Analyze (actions)` |
+| **Live extract** | Not a merge gate. A repo admin comments `/test` to run `pytest -m live` on the default branch only, so unmerged code never sees hosted keys |
 
-Branch protection should require at least `Lint and type-check`, `PR description and size`, and `Analyze (python)`.
+`main` cannot merge while any required check is red or pending. Required checks are **CI**, **PR quality**, **Analyze (python)**, and **Analyze (actions)**. Admins are not exempt. Force-pushes and deleting `main` stay blocked. Live extract is optional and must stay that way.
 
 ## Studio and serve
 
@@ -61,7 +67,7 @@ Do not commit `*.db`, `*.db-wal`, `*.db-shm`, Studio `node_modules`, or `.next`.
 
 ## Pull requests
 
-`main` is protected. One concern per PR.
+`main` is protected and cannot merge while required checks are red or pending. One concern per PR.
 
 1. Title includes exactly one of `[low-risk]`, `[medium-risk]`, `[high-risk]`.
 2. Add **one** new file `changes/<kebab-slug>.md` (What + Why), unless the title includes `[no-changeset]`.
