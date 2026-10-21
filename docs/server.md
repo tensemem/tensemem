@@ -37,6 +37,7 @@ When `--token` or `TENSEMEM_TOKEN` is set, or any Studio key has been issued, ev
 | `GET` | `/v1/insights/act-risk` | safe-to-act verdict |
 | `POST` | `/v1/studio/sample` | GST / itinerary sample |
 | `GET/POST` | `/v1/ops/keys` | issue / list hashed keys |
+| `POST` | `/v1/ops/keys:revoke` | revoke a key by `id` |
 | `GET` | `/v1/ops/requests` | request log |
 | `GET/PUT` | `/v1/ops/provider` | llm / embedder names |
 

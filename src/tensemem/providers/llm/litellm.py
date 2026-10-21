@@ -12,7 +12,6 @@ from tensemem.providers.llm.base import ProviderError, load_optional
 
 T = TypeVar("T", bound=BaseModel)
 _DEFAULT_TIMEOUT_SECONDS = 45.0
-_CONNECT_TIMEOUT_SECONDS = 20.0
 
 
 class LiteLLMProvider:
@@ -69,12 +68,8 @@ class LiteLLMProvider:
         return _validate(schema, content)
 
 
-def _completion_timeout() -> object:
-    try:
-        import httpx
-    except ImportError:
-        return _DEFAULT_TIMEOUT_SECONDS
-    return httpx.Timeout(_DEFAULT_TIMEOUT_SECONDS, connect=_CONNECT_TIMEOUT_SECONDS)
+def _completion_timeout() -> float:
+    return _DEFAULT_TIMEOUT_SECONDS
 
 
 def _litellm_error(model: str, extra: Exception) -> str:

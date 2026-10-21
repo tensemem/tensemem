@@ -111,7 +111,10 @@ def dispatch(
         llm = str(provider_settings(mem).get("llm") or "fake")
         credentials = hosted_secret_status(llm)
         print(f"tensemem serve: {extra}", file=sys.stderr)
-        print(f"tensemem serve: credentials={credentials}", file=sys.stderr)
+        print(
+            f"tensemem serve: llm={llm} key_ok={bool(credentials.get('ok'))}",
+            file=sys.stderr,
+        )
         return 504, {"error": str(extra), "credentials": credentials}
     except ValueError as extra:
         return 400, {"error": str(extra)}
@@ -170,7 +173,9 @@ def create_app(
         authorization = request.headers.get("authorization")
         path = request.url.path
         method = request.method
-        if not health_path(path) and not allow_request(mem, authorization, token):
+        if not health_path(path) and not await asyncio.to_thread(
+            allow_request, mem, authorization, token
+        ):
             return json_response({"error": "unauthorized"}, status_code=401)
         body: Mapping[str, object] = {}
         if request.method in {"POST", "PUT", "PATCH"}:
@@ -203,13 +208,15 @@ def create_app(
             namespace=namespace,
         )
         if str(path).startswith("/v1/"):
-            log_request(
+            await asyncio.to_thread(
+                log_request,
                 mem,
                 method=method,
                 path=str(path),
                 status=status,
                 latency_ms=int((time.monotonic() - started) * 1000),
                 authorization=authorization,
+                bootstrap=token,
             )
         return json_response(payload, status_code=status)
 

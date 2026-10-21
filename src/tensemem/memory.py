@@ -147,6 +147,11 @@ class Memory:
     def has_worker(self) -> bool:
         return self._llm is not None or self._embedder is not None
 
+    def extract_worker_alive(self) -> bool:
+        """True when the in-process extract thread is running."""
+        worker = self._worker
+        return worker is not None and worker.is_alive()
+
     def store(self) -> SqliteDatabase:
         """Underlying SQLite store. Studio ops use this for keys and settings."""
         return self._db
@@ -161,8 +166,11 @@ class Memory:
 
     def start_extract_worker(self) -> None:
         """Start the extract loop if it is not already running."""
-        if self._worker is not None and self._worker.is_alive():
-            return
+        previous = self._worker
+        if previous is not None and previous.is_alive():
+            if not self._stop.is_set():
+                return
+            previous.join(timeout=5.0)
         self._stop.clear()
         self._worker = threading.Thread(
             target=self._run_worker,

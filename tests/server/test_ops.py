@@ -1,8 +1,10 @@
+import time
+from pathlib import Path
 from typing import cast
 
 from tensemem import FakeExtractor, Memory
 from tensemem.mcp import seed_starter
-from tensemem.ops import allow_request, log_request
+from tensemem.ops import allow_request, header_matches_key, log_request, set_provider
 from tensemem.server import ROUTES, dispatch
 
 
@@ -45,12 +47,41 @@ def test_ops_keys_provider_and_auth() -> None:
             latency_ms=4,
             authorization=f"Bearer {token}",
         )
+        log_request(
+            mem,
+            method="GET",
+            path="/v1/stats",
+            status=200,
+            latency_ms=2,
+            authorization="Bearer admin",
+            bootstrap="admin",
+        )
         status, logs = dispatch(mem, "GET", "/v1/ops/requests")
         assert status == 200
         rows = _rows(logs, "requests")
         assert any(row["path"] == "/v1/state" for row in rows)
         assert any(row["key_prefix"] == token[:10] for row in rows)
+        assert any(row["key_prefix"] == "bootstrap" for row in rows)
+        assert header_matches_key(mem, f"Bearer {second['token']}") is True
+        assert header_matches_key(mem, "Bearer not-the-issued-token") is False
     assert ("POST", "/v1/ops/keys") in ROUTES
+    assert ("POST", "/v1/ops/keys:revoke") in ROUTES
+    server_docs = Path("docs/server.md").read_text(encoding="utf-8")
+    assert "`/v1/ops/keys:revoke`" in server_docs
+
+
+def test_set_provider_halts_fake_and_restarts_hosted() -> None:
+    with Memory(":memory:", llm=FakeExtractor(), start_worker=False) as mem:
+        set_provider(mem, llm="openai", embedder="none")
+        assert mem.extract_worker_alive()
+        set_provider(mem, llm="fake", embedder="none")
+        set_provider(mem, llm="openai", embedder="none")
+        assert mem.extract_worker_alive()
+        set_provider(mem, llm="fake", embedder="none")
+        deadline = time.monotonic() + 2.0
+        while mem.extract_worker_alive() and time.monotonic() < deadline:
+            time.sleep(0.05)
+        assert not mem.extract_worker_alive()
 
 
 def _rows(payload: dict[str, object], key: str) -> list[dict[str, object]]:

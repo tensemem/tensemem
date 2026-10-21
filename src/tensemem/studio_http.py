@@ -25,8 +25,8 @@ def handle_inspect(
     route = path.rstrip("/") or "/"
     params = dict(query)
     payload = dict(body)
-    agent = str(payload.get("agent_id") or params.get("agent_id") or agent_id)
-    ns = str(payload.get("namespace") or params.get("namespace") or namespace)
+    agent = agent_id
+    ns = namespace
     try:
         if verb == "GET" and route == "/v1/scopes":
             return 200, {

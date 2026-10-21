@@ -5,6 +5,7 @@
 - Hosted `add()` waits up to 60s so a live extract can finish.
 - Extract prompt accepts durable facts about any subject (stories, articles, notes), not only first-person identity. Gemini registers unknown predicates and fills missing evidence quotes so those ops are not dropped.
 - Studio Memories lists facts in a full-width table (subject / predicate / object / status). Replace is disabled until a replacement value is entered.
+- Auth looks up issued keys by prefix, request logs store `bootstrap` instead of a bootstrap-token prefix, inspect routes stay on the server agent/namespace, and switching back to fake/none halts the extract worker.
 
 # Why
 

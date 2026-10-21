@@ -95,6 +95,19 @@ def test_inspect_and_insight_routes() -> None:
     assert ("GET", "/v1/insights/act-risk") in ROUTES
 
 
+def test_inspect_ignores_request_namespace() -> None:
+    with Memory(":memory:", llm=FakeExtractor(), start_worker=False) as mem:
+        seed_starter(mem)
+        mem.add("hidden", "I live in Paris", namespace="other")
+        status, scopes = dispatch(mem, "GET", "/v1/scopes", query={"namespace": "other"})
+        assert status == 200
+        users = {str(row["user_id"]) for row in _rows(scopes, "scopes")}
+        assert "hidden" not in users
+        status, other = dispatch(mem, "GET", "/v1/scopes", namespace="other")
+        assert status == 200
+        assert "hidden" in {str(row["user_id"]) for row in _rows(other, "scopes")}
+
+
 def test_correct_via_http() -> None:
     with Memory(":memory:", llm=FakeExtractor(), start_worker=False) as mem:
         seed_starter(mem)

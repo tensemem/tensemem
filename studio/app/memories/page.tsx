@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { api, type Fact } from "@/lib/api";
 import { ScopeBar } from "../scope";
 
@@ -14,8 +14,13 @@ export default function MemoriesPage() {
   const [explain, setExplain] = useState<Record<string, unknown> | null>(null);
   const [err, setErr] = useState("");
 
+  const current = useRef("");
   const load = useCallback(async (who: string) => {
+    current.current = who;
     const history = await api.history(who);
+    if (current.current !== who) {
+      return;
+    }
     setFacts(history.facts);
   }, []);
 

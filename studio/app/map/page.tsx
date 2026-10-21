@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { api, type Fact } from "@/lib/api";
 import { ScopeBar } from "../scope";
 
@@ -13,8 +13,13 @@ export default function MapPage() {
   });
   const [err, setErr] = useState("");
 
+  const current = useRef("");
   const load = useCallback(async (who: string) => {
+    current.current = who;
     const [history, drawn] = await Promise.all([api.history(who), api.graph(who)]);
+    if (current.current !== who) {
+      return;
+    }
     setFacts(history.facts);
     setGraph(drawn);
   }, []);
@@ -56,7 +61,12 @@ export default function MapPage() {
         </div>
       ))}
       <h2>Graph</h2>
-      <svg viewBox="0 0 900 420" width="100%" height="420" style={{ background: "#101218", borderRadius: 10 }}>
+      <svg
+        viewBox={`0 0 900 ${Math.max(420, 50 + Math.ceil(graph.nodes.length / 6) * 90)}`}
+        width="100%"
+        height={Math.max(420, 50 + Math.ceil(graph.nodes.length / 6) * 90)}
+        style={{ background: "#101218", borderRadius: 10 }}
+      >
         {graph.edges.map((edge, index) => {
           const from = graph.nodes.findIndex((node) => node.id === edge.source);
           const to = graph.nodes.findIndex((node) => node.id === edge.target);

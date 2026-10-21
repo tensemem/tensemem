@@ -97,7 +97,10 @@ def header_matches_key(mem: Memory, authorization: str | None) -> bool:
         return False
 
     def load(conn: sqlite3.Connection) -> list[str]:
-        rows = conn.execute("SELECT secret_hash FROM api_keys WHERE revoked_at IS NULL").fetchall()
+        rows = conn.execute(
+            "SELECT secret_hash FROM api_keys WHERE revoked_at IS NULL AND prefix = ?",
+            (token[:10],),
+        ).fetchall()
         return [str(row["secret_hash"]) for row in rows]
 
     try:
@@ -126,9 +129,10 @@ def log_request(
     status: int,
     latency_ms: int,
     authorization: str | None,
+    bootstrap: str | None = None,
 ) -> None:
     now = mem.store().now()
-    prefix = _bearer_prefix(authorization)
+    prefix = _bearer_prefix(authorization, bootstrap=bootstrap)
 
     def write(conn: sqlite3.Connection) -> None:
         conn.execute(
@@ -197,8 +201,13 @@ def set_provider(mem: Memory, *, llm: str, embedder: str) -> dict[str, object]:
     mem.apply_embedder(_embedder_from_name(embed))
     if name != "fake" or embed != "none":
         mem.start_extract_worker()
+    else:
+        mem.halt()
     credentials = hosted_secret_status(name)
-    print(f"tensemem serve: provider={name} credentials={credentials}", file=sys.stderr)
+    print(
+        f"tensemem serve: provider={name} key_ok={bool(credentials.get('ok'))}",
+        file=sys.stderr,
+    )
     if name != "fake" and not bool(credentials.get("ok")):
         print(
             "tensemem serve: hosted extract will fail until the env key is set "
@@ -301,9 +310,13 @@ def _embedder_from_name(name: str) -> Embedder | None:
     raise ValueError("embedder must be none, openai, or fastembed")
 
 
-def _bearer_prefix(authorization: str | None) -> str | None:
+def _bearer_prefix(authorization: str | None, *, bootstrap: str | None = None) -> str | None:
     header = (authorization or "").strip()
     if not header.startswith("Bearer "):
         return None
     token = header[7:].strip()
-    return token[:10] if token else None
+    if not token:
+        return None
+    if (bootstrap or "").strip() and authorize(authorization, bootstrap):
+        return "bootstrap"
+    return token[:10]

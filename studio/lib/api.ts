@@ -45,11 +45,17 @@ async function req<T>(path: string, init: RequestInit = {}): Promise<T> {
   const token = getToken();
   if (token) headers.set("authorization", `Bearer ${token}`);
   const response = await fetch(path, { ...init, headers });
-  const payload = (await response.json()) as T & { error?: string };
-  if (!response.ok) {
-    throw new Error(payload.error ?? `${response.status}`);
+  const raw = await response.text();
+  let payload: (T & { error?: string }) | null = null;
+  try {
+    payload = raw ? (JSON.parse(raw) as T & { error?: string }) : null;
+  } catch {
+    payload = null;
   }
-  return payload;
+  if (!response.ok) {
+    throw new Error(payload?.error ?? `${response.status} ${response.statusText}`);
+  }
+  return payload as T;
 }
 
 export const api = {

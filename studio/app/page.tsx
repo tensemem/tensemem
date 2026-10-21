@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { api } from "@/lib/api";
 import { ScopeBar } from "./scope";
 
@@ -10,13 +10,21 @@ export default function BoardPage() {
   const [jobs, setJobs] = useState<Array<Record<string, unknown>>>([]);
   const [err, setErr] = useState("");
 
+  const current = useRef("");
   const load = useCallback(async (who: string) => {
+    current.current = who;
     setErr("");
     try {
       const [nextRisk, nextJobs] = await Promise.all([api.actRisk(who), api.jobs(who)]);
+      if (current.current !== who) {
+        return;
+      }
       setRisk(nextRisk);
       setJobs(nextJobs.jobs);
     } catch (error) {
+      if (current.current !== who) {
+        return;
+      }
       setRisk(null);
       setJobs([]);
       setErr(error instanceof Error ? error.message : "unavailable");
