@@ -2,24 +2,11 @@
 
 **Memory that knows its tenses.** Embedded, deterministic memory that AI agents can safely act on.
 
-> Status: pre-alpha. The deterministic API can set facts and render fenced `context()`. `context(query=...)` and `search()` rank by FTS (optional embeddings). `add()` plus `flush()`, `add(..., wait=True)`, or `context(..., wait=)` runs extract jobs through `FakeExtractor` or any `LLMProvider`. `AsyncMemory` mirrors the sync API. A `tensemem` CLI inspects state, history, search, and jobs. `tensemem mcp` (`tensemem[mcp]`) serves remember/recall over stdio or Streamable HTTP (`--http`). `tensemem serve` (`tensemem[server]`) exposes remember/recall plus inspect/insight routes over HTTP. `--token` / `TENSEMEM_TOKEN` is optional bearer auth. TenseMem Studio (`studio/`) is a Next.js inspector for that server. `TenseMemStore` (`tensemem[langgraph]`) maps `put` / `search` onto `add()` / `context()`. `TenseMemChatMemory` (`tensemem[llamaindex]`) maps `put` / `get` onto `add()` / `context()`. `backup()`, `export_jsonl` / `import_jsonl`, `rebuild()`, `stats()`, and hooks cover durability and ops. `Memory(..., store=)` accepts a `SqliteBackend`; the default is SQLite.
+One SQLite file. No server required. The model proposes typed facts; the engine decides what is current.
 
-## The problem
-
-Vector memory has no idea what is current. Tell an agent "I live in Delhi" in January and "I moved to Bangalore" in June, and a similarity search returns both, leaving the model to guess.
-
-Even memory that tracks changes usually can't tell you whether it's up to date, and it tends to re-learn its own output when recalled facts flow back into the conversation. For an agent that books travel, edits code, or changes an order, stale or self-reinforced memory is a bug.
-
-## What TenseMem does
-
-- **One current truth per fact, enforced.** Declare that `lives_in` has a single value, and the engine guarantees it: a new value supersedes the old one, which stays in history for "where did I live before?"
-- **Every read says how fresh it is.** Results report which messages they reflect and whether any are still being processed. Ask for a specific message to be applied before you act, or get a clear flag that it hasn't been.
-- **Memory never learns from its own echo.** Recalled context is fenced and ignored on the way back in, and every fact needs a verbatim quote from the user.
-- **Mistakes can be corrected for good.** Mark a fact wrong and the value it displaced comes back; corrections survive re-extraction with a newer model.
-- **The LLM proposes, the engine decides.** The model turns text into typed operations; deterministic, tested rules decide how state changes.
-- **No infrastructure.** A single SQLite file inside your process.
-
-## API
+```bash
+pip install tensemem
+```
 
 ```python
 from tensemem import FakeExtractor, Memory
@@ -28,39 +15,139 @@ mem = Memory(llm=FakeExtractor())
 mem.register_predicate("lives_in")
 added = mem.add("u1", "I live in Delhi")
 ctx = mem.context(user_id="u1", min_seq=added.seq, wait=1.5)
-mem.state(user_id="u1").values  # {"lives_in": "Delhi"}
-
-mem.set(user_id="u1", predicate="lives_in", value="Bangalore")
-history = mem.history(user_id="u1", predicate="lives_in")
-bangalore = next(fact for fact in history.facts if fact.object == "Bangalore")
-mem.correct(bangalore.id)  # restores the value it displaced ("Delhi")
-
-ctx = mem.context(user_id="u1", query="where did I live", max_tokens=200)
-print(ctx.text)  # fenced Markdown; ctx.freshness.is_current; ctx.debug for scores
-hits = mem.search(user_id="u1", query="live")
-mem.stats(user_id="u1")
-mem.backup("tensemem.bak.db")
+print(ctx.text)  # fenced block the model can read
+print(ctx.freshness.is_current)  # True once extract finished
 ```
+
+`FakeExtractor` is rule-based and needs no API key. Same API with `tensemem[openai]`, `tensemem[anthropic]`, `tensemem[ollama]`, `tensemem[litellm]`, or Gemini (`GEMINI_API_KEY` in the process environment).
+
+## Why this exists
+
+Similarity search returns both “I live in Delhi” and “I moved to Bangalore” and leaves the model to guess. TenseMem keeps one current value per slot, says whether the read is fresh, and refuses to learn from its own output.
+
+- **One current truth per ONE slot.** A new city supersedes the old one. History still answers “where did I live before?”
+- **Every read reports freshness.** `as_of_seq`, `pending`, `is_current`. Wait for a message, or see that it is not applied yet.
+- **No self-echo.** Recalled `context()` is fenced. Extract needs a verbatim quote from the user.
+- **Corrections stick.** `correct()` restores the displaced value and survives `rebuild()` with a newer model.
+- **The engine decides.** The LLM emits typed ops. Deterministic rules apply them.
+- **No infrastructure.** Default store is one SQLite file inside your process.
+
+## Delhi, then Bangalore
+
+```python
+mem.add("u1", "I live in Delhi")
+mem.set(user_id="u1", predicate="lives_in", value="Bangalore")
+
+print(mem.state("u1").values)
+# {"lives_in": "Bangalore"}
+
+history = mem.history("u1", predicate="lives_in")
+# ACTIVE Bangalore, SUPERSEDED Delhi
+
+bangalore = next(f for f in history.facts if f.object == "Bangalore")
+mem.correct(bangalore.id)  # that move was never true
+print(mem.state("u1").values)
+# {"lives_in": "Delhi"}
+```
+
+```mermaid
+flowchart LR
+  E[episodes] --> X[extractor proposes ops]
+  X --> R[resolver]
+  R --> F[facts]
+  F --> C["context() + freshness"]
+  C -.->|fence stripped| X
+```
+
+## Architecture
+
+Every surface is an adapter over `Memory` / `AsyncMemory`. The model proposes typed ops; `resolve()` decides mutations; `apply()` writes one SQLite file. Facts are a rebuildable projection of an append-only episode log.
+
+![TenseMem architecture: surfaces, write path, extract worker, read path, SQLite store, and providers](docs/architecture.svg)
+
+Editable source: [docs/architecture.excalidraw](docs/architecture.excalidraw). File map: [Architecture](docs/architecture.md).
+
+| If you are changing… | Start here |
+|---|---|
+| Python / CLI / REST / MCP API | `src/tensemem/memory.py`, `cli/main.py`, `server.py`, `mcp.py` |
+| Studio UI | `studio/app/` (board, memories, playground, echo, ops) and `studio/lib/api.ts` |
+| Extract prompt or worker | `pipeline/prompts/extract_v1.md`, `pipeline/worker.py`, `pipeline/extractor.py` |
+| What an op is allowed to do | `core/resolver.py` (pure), `pipeline/normalize.py`, `pipeline/policy.py`, `pipeline/guard.py` |
+| A new LLM or embedder | `providers/llm/`, `providers/embed/` — keys in process env only |
+| SQLite schema or reads | `storage/sqlite/` (one writer; ADR 0003 / 0020) |
+| Freshness, fence, corrections | `storage/sqlite/snapshot.py`, `security/fence.py`, `correct()` |
+| Invariants | `tests/core/`, `tests/property/`, `tests/golden/` — default pytest never calls a hosted model |
+
+Do not auto-register unknown predicates, skip `keep_ops`, or teach the engine from fenced `context()` text. Those are locked by tests.
+
+## Safe to act (TenseBench)
+
+`tensemem bench` scores the packaged 101 conversations with `FakeExtractor` (no network):
+
+| System | Current-state accuracy | Stale-fact leak | Freshness honesty | Contamination |
+|---|---:|---:|---:|---:|
+| TenseMem | 1.00 | 0.00 | 1.00 | 0.00 |
+| Concatenated transcript | 0.37 | 1.00 | 0.00 | n/a |
+| Token-overlap retrieval | 0.37 | 1.00 | 0.00 | n/a |
+
+Reproduce with `tensemem bench`. Methodology: [TenseBench](docs/tensebench.md).
+
+## Inspect
 
 ```bash
 tensemem inspect --user u1
 tensemem history --user u1 lives_in
 tensemem search --user u1 "where did I live"
-tensemem jobs
-tensemem bench
-tensemem longmem
-tensemem locomo
-tensemem latency
-tensemem mcp --user u1
-tensemem mcp --http
-tensemem serve
 ```
 
-`mem.add(user_id, text)` writes the episode and an extract job in one transaction. Secrets in that text are redacted with detect-secrets before they are stored or sent to a model. Pass `llm=` to process jobs on a background thread (`AsyncMemory` uses an asyncio task). `flush()`, `add(..., wait=True)`, or `context(..., wait=seconds)` wait until due jobs finish, preferring that scope. If extract has not finished, `context()` still includes a hot buffer of unprocessed user messages. Consecutive queued messages in one scope share one extract call. Recalled `context()` blocks are stripped before extract; operations whose evidence is not a verbatim quote from the remaining user text are dropped. Empty leftover messages are skipped without an LLM call. Dead jobs can be dismissed or retried. Tests use `FakeExtractor`. Optional extras: `tensemem[openai]`, `tensemem[anthropic]`, `tensemem[ollama]` (`OllamaProvider`, local), `tensemem[litellm]` (`LiteLLMProvider`, any routed model), `tensemem[local]` (FastEmbed), `tensemem[mcp]` (`tensemem mcp` stdio or Streamable HTTP), `tensemem[server]` (`tensemem serve` HTTP), `tensemem[langgraph]` (`TenseMemStore`), and `tensemem[llamaindex]` (`TenseMemChatMemory`). `--token` or `TENSEMEM_TOKEN` is a Bearer token on HTTP. `tensemem longmem --llm` / `tensemem locomo --llm` use a hosted extractor on a downloaded pack; CI stays on `FakeExtractor`. Pass `embedder=` to store vectors in the background and boost `search()` / `context(query=)`. Temporal questions (`"where did I live before"`) and `include_history=True` include superseded values. Weak fact matches fall back to episode snippets. `fmt="json"` or `"xml"` changes the renderer.
+[TenseMem Studio](docs/studio.md) is a local Next.js inspector over `tensemem serve` (board, memories table, playground, compare, echo). It is not a chatbot. Secrets stay in the serve process environment — never in the Token field. Studio lives in the git checkout, not on PyPI.
+
+```bash
+git clone https://github.com/tensemem/tensemem.git
+cd tensemem
+pip install "tensemem[server]"
+```
+
+Terminal 1 — HTTP:
+
+```bash
+tensemem --db ./studio.db serve --port 8080
+```
+
+Terminal 2 — Studio:
+
+```bash
+cd studio && npm install && npm run dev
+```
+
+## Extras
+
+| Extra | What you get |
+|---|---|
+| `tensemem[openai]` / `[anthropic]` / `[ollama]` / `[litellm]` | Hosted or local extract |
+| `tensemem[server]` | `tensemem serve` REST + Studio backend |
+| `tensemem[mcp]` | stdio or `tensemem mcp --http` |
+| `tensemem[langgraph]` | `TenseMemStore` (`put` / `search`) |
+| `tensemem[llamaindex]` | `TenseMemChatMemory` (`put` / `get`) |
+| `tensemem[local]` | FastEmbed vectors for search |
+
+Gemini extract uses `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) in the environment of the process that runs extract. No extra package beyond the server if you use the built-in Gemini adapter.
+
+`--token` / `TENSEMEM_TOKEN` is optional bearer auth on HTTP. Bind stays loopback unless you put a TLS proxy in front.
+
+## Status
+
+**0.1.0 alpha.** The Python API, CLI, REST, MCP, and Studio are usable on a single SQLite file. The default store is SQLite; a second SQL dialect is not shipped. Multi-tenant hosted Studio is not in this tree.
+
+## Docs
+
+[Quickstart](docs/quickstart.md) · [Concepts](docs/concepts.md) · [Architecture](docs/architecture.md) · [API](docs/api.md) · [CLI](docs/cli.md) · [REST](docs/server.md) · [Studio](docs/studio.md) · [MCP](docs/mcp.md) · [Operations](docs/ops.md) · [ADRs](docs/adr/)
+
+`uvx mkdocs serve` previews the same pages locally.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and workflow, [docs/](docs/) for the docs site (quickstart, concepts, API, CLI, MCP, REST, TenseBench, ops), and [docs/adr](docs/adr) for the design decisions behind the engine. Labeled extract cases (150+) live in `tests/golden/`; `pytest tests/golden` scores `FakeExtractor`, and `python -m tensemem.eval` prints precision and recall. `tensemem bench` (or `python -m tensemem.eval bench`) scores the TenseBench pack. `tensemem longmem` (or `python -m tensemem.eval longmem`) scores a LongMemEval-shaped JSON pack. `tensemem locomo` (or `python -m tensemem.eval locomo`) scores a LoCoMo-shaped JSON pack. `tensemem latency` (or `python -m tensemem.eval latency`) times empty-query `context()`. Preview docs with `uvx mkdocs serve`.
+See [CONTRIBUTING.md](CONTRIBUTING.md). `main` is protected; every change is a pull request. Merges wait until **CI**, **PR quality**, and CodeQL are green.
 
 ## License
 

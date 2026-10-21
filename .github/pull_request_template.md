@@ -1,3 +1,6 @@
+<!-- Title: imperative, with exactly one of [low-risk] [medium-risk] [high-risk]. -->
+<!-- Add changes/<kebab-slug>.md (What + Why) unless the title includes [no-changeset]. -->
+
 ## What
 
 <!-- Bullet list of concrete changes in this PR. -->

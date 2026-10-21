@@ -13,7 +13,7 @@ requires-python = ">=3.11"
 authors = [{ name = "Shubham" }]
 keywords = ["llm", "ai-agents", "memory", "temporal", "sqlite", "rag"]
 classifiers = [
-  "Development Status :: 1 - Planning",
+  "Development Status :: 3 - Alpha",
   "Intended Audience :: Developers",
   "Operating System :: OS Independent",
   "Programming Language :: Python :: 3",
@@ -50,6 +50,7 @@ tensemem = "tensemem.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/tensemem/tensemem"
+Documentation = "https://github.com/tensemem/tensemem/tree/main/docs"
 Repository = "https://github.com/tensemem/tensemem"
 Issues = "https://github.com/tensemem/tensemem/issues"
 
@@ -74,7 +75,19 @@ packages = ["src/tensemem"]
 "src/tensemem/eval/locomo_pilot.json" = "tensemem/eval/locomo_pilot.json"
 
 [tool.hatch.build.targets.sdist]
-include = ["src", "tests", "examples", "docs", "studio", "README.md", "LICENSE", "pyproject.toml", "mkdocs.yml"]
+include = [
+  "src",
+  "tests",
+  "examples",
+  "docs",
+  "studio",
+  "README.md",
+  "CONTRIBUTING.md",
+  "SECURITY.md",
+  "LICENSE",
+  "pyproject.toml",
+  "mkdocs.yml",
+]
 
 [tool.ruff]
 line-length = 100
