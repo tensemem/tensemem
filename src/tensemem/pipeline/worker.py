@@ -10,6 +10,7 @@ unfenced user text (ADR 0007).
 from __future__ import annotations
 
 import sqlite3
+import sys
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 
@@ -247,6 +248,7 @@ def _fail(
 ) -> None:
     error = str(exc) or type(exc).__name__
     message = error[:_ERROR_LIMIT]
+    print(f"tensemem extract: {type(exc).__name__}: {message}", file=sys.stderr)
     provider_error = isinstance(exc, ProviderError)
     for item in leased.items:
 

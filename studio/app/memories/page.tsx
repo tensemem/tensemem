@@ -8,7 +8,7 @@ export default function MemoriesPage() {
   const [user, setUser] = useState("studio-demo");
   const [query, setQuery] = useState("");
   const [text, setText] = useState("");
-  const [replacement, setReplacement] = useState("");
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [facts, setFacts] = useState<Fact[]>([]);
   const [hits, setHits] = useState<Array<Record<string, unknown>>>([]);
   const [explain, setExplain] = useState<Record<string, unknown> | null>(null);
@@ -30,7 +30,7 @@ export default function MemoriesPage() {
   return (
     <>
       <h1>Memories</h1>
-      <p className="lead">Browse, search, add, correct, or forget a scope. Edit is deny / restore — not a rewrite.</p>
+      <p className="lead">Browse, search, add, replace, or forget a scope. Replace needs a new value.</p>
       <ScopeBar onUser={handleUser} />
       {err ? <p className="err">{err}</p> : null}
       <div className="card" style={{ marginTop: "1rem" }}>
@@ -50,9 +50,14 @@ export default function MemoriesPage() {
           <button
             className="primary"
             onClick={async () => {
-              await api.add(user, text);
-              setText("");
-              await load(user);
+              setErr("");
+              try {
+                await api.add(user, text);
+                setText("");
+                await load(user);
+              } catch (error) {
+                setErr(error instanceof Error ? error.message : "add failed");
+              }
             }}
           >
             Add
@@ -70,44 +75,75 @@ export default function MemoriesPage() {
         </div>
       </div>
       <h2>Facts</h2>
-      {facts.map((fact) => (
-        <div className="lane" key={fact.id}>
-          <div>
-            <span className={`dot ${fact.status === "ACTIVE" ? "now" : "was"}`} />
-            {fact.predicate}
-          </div>
-          <div>
-            <strong>{fact.object}</strong>{" "}
-            <span className={`badge ${fact.status === "ACTIVE" ? "act" : "was"}`}>{fact.status}</span>
-            <button
-              style={{ marginLeft: "0.5rem" }}
-              onClick={async () => setExplain(await api.explain(fact.id))}
-            >
-              Timeline
-            </button>
-            {fact.status === "ACTIVE" ? (
-              <>
-                <input
-                  value={replacement}
-                  onChange={(event) => setReplacement(event.target.value)}
-                  placeholder="replacement (optional)"
-                  style={{ marginLeft: "0.4rem", width: "12rem" }}
-                />
-                <button
-                  style={{ marginLeft: "0.4rem" }}
-                  onClick={async () => {
-                    await api.correct(fact.id, replacement || undefined);
-                    setReplacement("");
-                    await load(user);
-                  }}
-                >
-                  Correct
-                </button>
-              </>
-            ) : null}
-          </div>
+      {facts.length ? (
+        <div className="table-wrap">
+          <table className="facts">
+            <thead>
+              <tr>
+                <th className="col-subject">Subject</th>
+                <th className="col-predicate">Predicate</th>
+                <th className="col-object">Object</th>
+                <th className="col-status">Status</th>
+                <th className="col-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {facts.map((fact) => (
+                <tr key={fact.id}>
+                  <td className="col-subject">{fact.subject}</td>
+                  <td className="col-predicate">{fact.predicate}</td>
+                  <td className="col-object">{fact.object}</td>
+                  <td className="col-status">
+                    <span className="status">
+                      <span className={`dot ${fact.status === "ACTIVE" ? "now" : "was"}`} />
+                      <span className={`badge ${fact.status === "ACTIVE" ? "act" : "was"}`}>{fact.status}</span>
+                    </span>
+                  </td>
+                  <td className="col-actions">
+                    <div className="actions">
+                      <button type="button" onClick={async () => setExplain(await api.explain(fact.id))}>
+                        Timeline
+                      </button>
+                      {fact.status === "ACTIVE" ? (
+                        <>
+                          <input
+                            value={drafts[fact.id] ?? ""}
+                            onChange={(event) =>
+                              setDrafts((current) => ({ ...current, [fact.id]: event.target.value }))
+                            }
+                            placeholder="replacement"
+                          />
+                          <button
+                            type="button"
+                            disabled={!(drafts[fact.id] ?? "").trim()}
+                            onClick={async () => {
+                              const replacement = (drafts[fact.id] ?? "").trim();
+                              if (!replacement) {
+                                return;
+                              }
+                              await api.correct(fact.id, replacement);
+                              setDrafts((current) => {
+                                const next = { ...current };
+                                delete next[fact.id];
+                                return next;
+                              });
+                              await load(user);
+                            }}
+                          >
+                            Replace
+                          </button>
+                        </>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      ))}
+      ) : (
+        <p className="lead">No facts in this scope yet.</p>
+      )}
       {hits.length ? (
         <>
           <h2>Search hits</h2>

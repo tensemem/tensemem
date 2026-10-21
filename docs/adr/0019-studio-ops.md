@@ -11,7 +11,7 @@ ADR 0015 is one optional bearer token. A dashboard needs issue/revoke keys, a re
 
 1. **API keys** live in SQLite (`prefix` + PBKDF2 hash). `Authorization: Bearer` accepts `TENSEMEM_TOKEN` or any live key. When any live key exists, anonymous `/v1` calls are rejected. `GET /health` stays open.
 2. **Request log** records method, path, status, latency, and key prefix (not the secret).
-3. **Provider settings** persist `llm` / `embedder` names. Secrets stay in the environment. Default is fake. Saving a hosted name applies it in-process and starts the extract worker. The worker stays off in the default fake path so queued jobs are not stolen.
+3. **Provider settings** persist `llm` / `embedder` names (`fake`, `openai`, `anthropic`, `ollama`, `litellm`, `gemini`). Secrets stay in the environment. Default is fake. Saving a hosted name applies it in-process and starts the extract worker. `gemini` calls Gemini `generateContent` with `gemini-3.6-flash` and `GEMINI_API_KEY`. The worker stays off in the default fake path so queued jobs are not stolen.
 
 ## Alternatives considered
 

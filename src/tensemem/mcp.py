@@ -282,6 +282,7 @@ def _remember(
         user_id,
         text,
         wait=mem.has_provider(),
+        timeout=60.0,
         agent_id=agent_id,
         namespace=namespace,
     )

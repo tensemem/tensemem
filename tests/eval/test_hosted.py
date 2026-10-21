@@ -4,7 +4,7 @@ from typing import Any, TypeVar
 import pytest
 from pydantic import BaseModel
 
-from tensemem.eval.hosted import provider_from_name
+from tensemem.eval.hosted import hosted_secret_status, provider_from_name
 from tensemem.eval.locomo import run_locomo
 from tensemem.eval.longmem import run_longmem
 
@@ -34,6 +34,24 @@ def test_provider_from_name_defaults_to_fake() -> None:
     assert provider_from_name("  ") is None
     with pytest.raises(ValueError, match="llm must be"):
         provider_from_name("mystery")
+
+
+def test_hosted_secret_status_reports_gemini_env(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    monkeypatch.delenv("GOOGLE_API_KEY", raising=False)
+    missing = hosted_secret_status("gemini")
+    assert missing["GEMINI_API_KEY"] is False
+    assert missing["ok"] is False
+    assert missing["model"] == "gemini-3.6-flash"
+    monkeypatch.setenv("GEMINI_API_KEY", "not-a-real-secret")
+    present = hosted_secret_status("gemini")
+    assert present["GEMINI_API_KEY"] is True
+
+
+def test_provider_from_name_gemini_uses_rest_adapter() -> None:
+    llm = provider_from_name("gemini")
+    assert llm is not None
+    assert llm.model == "gemini-3.6-flash"
 
 
 def test_provider_from_name_openai_constructs() -> None:

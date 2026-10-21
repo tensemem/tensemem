@@ -6,12 +6,13 @@ import hashlib
 import hmac
 import secrets
 import sqlite3
+import sys
 from collections.abc import Mapping
 from typing import cast
 
 from tensemem.auth import authorize
 from tensemem.core.ids import new_ulid
-from tensemem.eval.hosted import provider_from_name
+from tensemem.eval.hosted import hosted_secret_status, provider_from_name
 from tensemem.memory import Memory
 from tensemem.providers.embed.base import Embedder
 from tensemem.providers.llm.fake import FakeExtractor
@@ -173,18 +174,20 @@ def list_requests(mem: Memory, *, limit: int = 50) -> list[dict[str, object]]:
         return []
 
 
-def provider_settings(mem: Memory) -> dict[str, str]:
+def provider_settings(mem: Memory) -> dict[str, object]:
+    llm = get_setting(mem, "llm", "fake")
     return {
-        "llm": get_setting(mem, "llm", "fake"),
+        "llm": llm,
         "embedder": get_setting(mem, "embedder", "none"),
+        "credentials": hosted_secret_status(llm),
     }
 
 
-def set_provider(mem: Memory, *, llm: str, embedder: str) -> dict[str, str]:
+def set_provider(mem: Memory, *, llm: str, embedder: str) -> dict[str, object]:
     name = llm.strip().casefold() or "fake"
     embed = embedder.strip().casefold() or "none"
-    if name not in {"fake", "openai", "anthropic", "ollama", "litellm"}:
-        raise ValueError("llm must be fake, openai, anthropic, ollama, or litellm")
+    if name not in {"fake", "openai", "anthropic", "ollama", "litellm", "gemini"}:
+        raise ValueError("llm must be fake, openai, anthropic, ollama, litellm, or gemini")
     if embed not in {"none", "openai", "fastembed"}:
         raise ValueError("embedder must be none, openai, or fastembed")
     set_setting(mem, "llm", name)
@@ -194,7 +197,15 @@ def set_provider(mem: Memory, *, llm: str, embedder: str) -> dict[str, str]:
     mem.apply_embedder(_embedder_from_name(embed))
     if name != "fake" or embed != "none":
         mem.start_extract_worker()
-    return {"llm": name, "embedder": embed}
+    credentials = hosted_secret_status(name)
+    print(f"tensemem serve: provider={name} credentials={credentials}", file=sys.stderr)
+    if name != "fake" and not bool(credentials.get("ok")):
+        print(
+            "tensemem serve: hosted extract will fail until the env key is set "
+            "in this serve process and the provider extra is installed",
+            file=sys.stderr,
+        )
+    return {"llm": name, "embedder": embed, "credentials": credentials}
 
 
 def get_setting(mem: Memory, key: str, default: str) -> str:
@@ -247,15 +258,12 @@ def handle_ops(
                 raise ValueError("limit must be an integer")
             return 200, {"requests": list_requests(mem, limit=int(raw_limit or 50))}
         if verb == "GET" and route == "/v1/ops/provider":
-            return 200, cast(dict[str, object], provider_settings(mem))
+            return 200, provider_settings(mem)
         if verb == "PUT" and route == "/v1/ops/provider":
-            return 200, cast(
-                dict[str, object],
-                set_provider(
-                    mem,
-                    llm=str(payload.get("llm") or "fake"),
-                    embedder=str(payload.get("embedder") or "none"),
-                ),
+            return 200, set_provider(
+                mem,
+                llm=str(payload.get("llm") or "fake"),
+                embedder=str(payload.get("embedder") or "none"),
             )
     except ValueError as extra:
         return 400, {"error": str(extra)}

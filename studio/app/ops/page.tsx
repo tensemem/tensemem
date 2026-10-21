@@ -9,6 +9,7 @@ export default function OpsPage() {
   const [requests, setRequests] = useState<Array<Record<string, unknown>>>([]);
   const [llm, setLlm] = useState("fake");
   const [embedder, setEmbedder] = useState("none");
+  const [credentials, setCredentials] = useState<Record<string, unknown>>({});
   const [err, setErr] = useState("");
 
   async function refresh() {
@@ -19,6 +20,7 @@ export default function OpsPage() {
       setRequests(log.requests);
       setLlm(provider.llm);
       setEmbedder(provider.embedder);
+      setCredentials(provider.credentials ?? {});
     } catch (error) {
       setErr(error instanceof Error ? error.message : "ops unavailable");
     }
@@ -70,6 +72,7 @@ export default function OpsPage() {
               <option value="anthropic">anthropic</option>
               <option value="ollama">ollama</option>
               <option value="litellm">litellm</option>
+              <option value="gemini">gemini</option>
             </select>
             <select value={embedder} onChange={(event) => setEmbedder(event.target.value)}>
               <option value="none">none</option>
@@ -78,7 +81,15 @@ export default function OpsPage() {
             </select>
             <button onClick={async () => { await api.setProvider(llm, embedder); await refresh(); }}>Save</button>
           </div>
-          <p className="lead">Hosted extract sends user text to that provider. Restart serve to apply a hosted model.</p>
+          {Object.keys(credentials).length ? (
+            <p className={`mono ${credentials.ok ? "" : "err"}`} style={{ marginTop: "0.6rem" }}>
+              {JSON.stringify(credentials)}
+            </p>
+          ) : null}
+          <p className="lead">
+            Hosted extract sends user text to that provider. For Gemini, export GEMINI_API_KEY in the serve
+            terminal, save gemini here, then Add on Memories. Do not paste the key into Token.
+          </p>
         </div>
       </div>
       <h2>Request log</h2>

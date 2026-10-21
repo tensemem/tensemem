@@ -18,9 +18,23 @@ def test_litellm_parses_injected_complete() -> None:
     result = provider.structured([{"role": "user", "content": "hi"}], ExtractionResult)
     assert result == expected
     assert seen["model"] == "openai/gpt-4o-mini"
+    assert seen["timeout"] is not None
+    assert seen["request_timeout"] is not None
     format_ = seen["response_format"]
     assert isinstance(format_, dict)
     assert format_["type"] == "json_schema"
+
+
+def test_litellm_gemini_sets_low_reasoning() -> None:
+    seen: dict[str, object] = {}
+
+    def complete(**kwargs: object) -> object:
+        seen.update(kwargs)
+        return _completion(ExtractionResult(ops=()).model_dump_json())
+
+    provider = LiteLLMProvider(model="gemini/gemini-3.8-flash", complete=complete)
+    provider.structured([{"role": "user", "content": "hi"}], ExtractionResult)
+    assert seen["reasoning_effort"] == "low"
 
 
 def test_litellm_prefers_parsed_field() -> None:

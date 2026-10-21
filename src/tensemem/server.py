@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import importlib
 import json
+import os
 import sys
 import time
 from collections.abc import Iterable, Mapping
@@ -13,6 +14,7 @@ from typing import Any, Final, cast
 
 from tensemem.auth import bind_warning, health_path
 from tensemem.core.errors import UnknownFactError, UnknownJobError
+from tensemem.eval.hosted import hosted_secret_status
 from tensemem.mcp import call_tool, seed_starter
 from tensemem.memory import Memory
 from tensemem.ops import allow_request, handle_ops, log_request, provider_settings, set_provider
@@ -105,6 +107,12 @@ def dispatch(
             )
     except (UnknownFactError, UnknownJobError) as extra:
         return 404, {"error": str(extra)}
+    except TimeoutError as extra:
+        llm = str(provider_settings(mem).get("llm") or "fake")
+        credentials = hosted_secret_status(llm)
+        print(f"tensemem serve: {extra}", file=sys.stderr)
+        print(f"tensemem serve: credentials={credentials}", file=sys.stderr)
+        return 504, {"error": str(extra), "credentials": credentials}
     except ValueError as extra:
         return 400, {"error": str(extra)}
     return 404, {"error": "not found"}
@@ -132,8 +140,9 @@ def serve(
     with Memory(path, llm=FakeExtractor(), start_worker=False) as mem:
         seed_starter(mem)
         settings = provider_settings(mem)
-        if settings["llm"] != "fake" or settings["embedder"] != "none":
-            set_provider(mem, llm=settings["llm"], embedder=settings["embedder"])
+        llm = (os.environ.get("TENSEMEM_LLM") or "").strip() or str(settings["llm"])
+        if llm != "fake" or str(settings["embedder"]) != "none":
+            set_provider(mem, llm=llm, embedder=str(settings["embedder"]))
         run_http(
             mem,
             host=host,

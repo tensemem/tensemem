@@ -109,7 +109,8 @@ export const api = {
   revokeKey: (id: string) =>
     req<Record<string, unknown>>("/v1/ops/keys:revoke", { method: "POST", body: JSON.stringify({ id }) }),
   requests: () => req<{ requests: Array<Record<string, unknown>> }>("/v1/ops/requests"),
-  provider: () => req<{ llm: string; embedder: string }>("/v1/ops/provider"),
+  provider: () =>
+    req<{ llm: string; embedder: string; credentials?: Record<string, unknown> }>("/v1/ops/provider"),
   setProvider: (llm: string, embedder: string) =>
     req<Record<string, unknown>>("/v1/ops/provider", { method: "PUT", body: JSON.stringify({ llm, embedder }) }),
 };

@@ -24,4 +24,18 @@ Open `http://127.0.0.1:3000`. Studio rewrites `/v1` to the server. Optional bear
 
 **Load sample workspace** seeds `studio-demo` with GST / itinerary / invoice turns. It does not run on open.
 
-Edit is `correct()`, not a free-text rewrite of a slot. Hosted extract (Ops) sends user text to that provider.
+Edit is `correct()`, not a free-text rewrite of a slot. Hosted extract (Ops) sends user text to that provider. Add extracts durable triples from that text — first-person profile lines, stories, or notes about any subject — not only facts about the speaker.
+
+## Gemini extract
+
+`GEMINI_API_KEY` (or `GOOGLE_API_KEY`) stays in the environment of `tensemem serve`. Do not paste it into Token.
+
+```bash
+# same terminal that runs serve
+export GEMINI_API_KEY=your-key
+cd /path/to/tensemem
+.venv/bin/pip install "tensemem[server,litellm]"   # once
+.venv/bin/tensemem --db ./studio.db serve --port 8080
+```
+
+In Studio **Ops**, set provider to **gemini** and Save. **Memories → Add** then sends that text to Gemini (`gemini-3.6-flash`, then `gemini-3.5-flash-lite` / `gemini-3.8-flash` if a model is overloaded). Optional: `TENSEMEM_LLM=gemini` on serve start, or `TENSEMEM_LITELLM_MODEL` to pick another Gemini model id.

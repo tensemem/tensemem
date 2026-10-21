@@ -34,6 +34,8 @@ def test_render_includes_registry_facts_and_time() -> None:
     assert "<description>city of residence</description>" in system
     assert "<object>Delhi</object>" in system
     assert "untrusted data" in system
+    assert "any subject" in system
+    assert "every distinct durable claim" in system
     assert messages[-1]["content"] == "I moved to Bangalore last week."
     assert PROMPT_VERSION == "extract_v1"
 

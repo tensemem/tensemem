@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Mapping, Sequence
 from typing import Any, TypeVar
 
@@ -10,6 +11,8 @@ from pydantic import BaseModel, ValidationError
 from tensemem.providers.llm.base import ProviderError, load_optional
 
 T = TypeVar("T", bound=BaseModel)
+_DEFAULT_TIMEOUT_SECONDS = 45.0
+_CONNECT_TIMEOUT_SECONDS = 20.0
 
 
 class LiteLLMProvider:
@@ -36,12 +39,25 @@ class LiteLLMProvider:
         )
         if not callable(complete):
             raise ProviderError("litellm completion is not callable")
-        response = complete(
-            model=self.model,
-            messages=list(messages),
-            response_format=_json_schema(schema),
-            **kwargs,
-        )
+        timeout = kwargs.pop("timeout", _completion_timeout())
+        extras: dict[str, object] = {}
+        if self.model.startswith("gemini/") and "reasoning_effort" not in kwargs:
+            extras["reasoning_effort"] = "low"
+        seconds = timeout if isinstance(timeout, int | float) else _DEFAULT_TIMEOUT_SECONDS
+        try:
+            response = complete(
+                model=self.model,
+                messages=list(messages),
+                response_format=_json_schema(schema),
+                timeout=timeout,
+                request_timeout=seconds,
+                **extras,
+                **kwargs,
+            )
+        except ProviderError:
+            raise
+        except Exception as extra:
+            raise ProviderError(_litellm_error(self.model, extra)) from extra
         choices = getattr(response, "choices", None)
         message = getattr(choices[0], "message", None) if choices else None
         parsed = getattr(message, "parsed", None)
@@ -51,6 +67,25 @@ class LiteLLMProvider:
         if content is None or content == "":
             raise ProviderError("litellm returned an empty structured response")
         return _validate(schema, content)
+
+
+def _completion_timeout() -> object:
+    try:
+        import httpx
+    except ImportError:
+        return _DEFAULT_TIMEOUT_SECONDS
+    return httpx.Timeout(_DEFAULT_TIMEOUT_SECONDS, connect=_CONNECT_TIMEOUT_SECONDS)
+
+
+def _litellm_error(model: str, extra: Exception) -> str:
+    gemini = bool(os.environ.get("GEMINI_API_KEY", "").strip())
+    google = bool(os.environ.get("GOOGLE_API_KEY", "").strip())
+    detail = str(extra) or type(extra).__name__
+    return (
+        f"{type(extra).__name__} model={model} "
+        f"GEMINI_API_KEY={'set' if gemini else 'missing'} "
+        f"GOOGLE_API_KEY={'set' if google else 'missing'}: {detail[:300]}"
+    )
 
 
 def _json_schema(schema: type[BaseModel]) -> dict[str, object]:

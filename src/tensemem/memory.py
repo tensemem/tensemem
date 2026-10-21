@@ -290,7 +290,12 @@ class Memory:
             self._wake.wait(timeout=min(_WORKER_IDLE, max(remaining, 0.0)))
             self._wake.clear()
         if self.waiting_for(job_id):
-            msg = f"extract jobs still pending after {timeout}s"
+            detail = ""
+            if job_id is not None:
+                job = self._db.write(lambda conn: get_job(conn, job_id))
+                if job is not None and job.last_error:
+                    detail = f": {job.last_error}"
+            msg = f"extract jobs still pending after {timeout}s{detail}"
             raise TimeoutError(msg)
 
     def waiting_for(self, job_id: str | None) -> bool:
