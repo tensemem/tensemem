@@ -57,6 +57,6 @@ Studio (`docs/studio.md`) is a Next.js client for these routes.
 
 `query` and `max_tokens` are optional on context (`query` defaults to empty, `max_tokens` to 300).
 
-Reads include freshness (`as_of_seq`, `pending`, `is_current`). Add waits in the request (no background worker), so jobs already queued for other scopes stay queued. POST bodies larger than 64 KiB are rejected.
+Reads include freshness (`as_of_seq`, `pending`, `is_current`). `POST /v1/memories:add` returns when the extract job is queued. Pass `"wait": true` to drain extract in that request. POST bodies larger than 64 KiB are rejected.
 
 This process does not start MCP. For a second process on the same file, see [Operations](ops.md).

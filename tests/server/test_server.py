@@ -16,7 +16,7 @@ def test_dispatch_add_context_state_history_forget() -> None:
             mem,
             "POST",
             "/v1/memories:add",
-            body={"user_id": "u1", "text": "I live in Delhi"},
+            body={"user_id": "u1", "text": "I live in Delhi", "wait": True},
         )
         assert status == 200
         assert _map(added, "values")["lives_in"] == "Delhi"
@@ -26,7 +26,7 @@ def test_dispatch_add_context_state_history_forget() -> None:
             mem,
             "POST",
             "/v1/memories:add",
-            body={"user_id": "u1", "text": "I moved to Bangalore"},
+            body={"user_id": "u1", "text": "I moved to Bangalore", "wait": True},
         )
         status, state = dispatch(mem, "GET", "/v1/state", query={"user_id": "u1"})
         assert status == 200
@@ -60,6 +60,22 @@ def test_dispatch_add_context_state_history_forget() -> None:
         status, empty = dispatch(mem, "GET", "/v1/state", query={"user_id": "u1"})
         assert status == 200
         assert empty["values"] == {}
+
+
+def test_dispatch_add_can_queue_without_waiting() -> None:
+    with Memory(":memory:", llm=FakeExtractor(), start_worker=False) as mem:
+        seed_starter(mem)
+        status, added = dispatch(
+            mem,
+            "POST",
+            "/v1/memories:add",
+            body={"user_id": "u1", "text": "I live in Delhi", "wait": False},
+        )
+        assert status == 200
+        assert added["job_id"]
+        assert "lives_in" not in _map(added, "values")
+        open_jobs = [job for job in mem.jobs("u1") if job.status is not JobStatus.DONE]
+        assert open_jobs
 
 
 def test_dispatch_health_errors_and_routes() -> None:

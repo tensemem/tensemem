@@ -266,6 +266,16 @@ def _load_uvicorn() -> Any:
     return run
 
 
+def _remember_wait(mem: Memory, arguments: Mapping[str, object]) -> bool:
+    """Default waits when a provider is set. Studio sends ``wait: false`` to queue only."""
+    raw = arguments.get("wait")
+    if raw is None:
+        return mem.has_provider()
+    if isinstance(raw, bool):
+        return raw
+    return str(raw).strip().casefold() in {"1", "true", "yes"}
+
+
 def _remember(
     mem: Memory,
     arguments: Mapping[str, object],
@@ -281,7 +291,7 @@ def _remember(
     added = mem.add(
         user_id,
         text,
-        wait=mem.has_provider(),
+        wait=_remember_wait(mem, arguments),
         timeout=60.0,
         agent_id=agent_id,
         namespace=namespace,

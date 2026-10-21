@@ -7,6 +7,7 @@ import { ScopeBar } from "../scope";
 export default function EchoPage() {
   const [user, setUser] = useState("studio-demo");
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
   return (
@@ -17,16 +18,21 @@ export default function EchoPage() {
       <div className="card" style={{ marginTop: "1rem" }}>
         <button
           className="primary"
+          type="button"
+          disabled={busy}
           onClick={async () => {
             setErr("");
+            setBusy(true);
             try {
               setResult(await api.echo(user, 8));
             } catch (error) {
               setErr(error instanceof Error ? error.message : "failed");
+            } finally {
+              setBusy(false);
             }
           }}
         >
-          Run 8 echo turns
+          {busy ? "Running…" : "Run 8 echo turns"}
         </button>
       </div>
       {err ? <p className="err">{err}</p> : null}

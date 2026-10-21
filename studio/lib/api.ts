@@ -20,6 +20,24 @@ export type Fact = {
 
 export type ScopeRow = { user_id: string; agent_id: string; namespace: string; applied_seq: number };
 
+export type GraphNode = {
+  id: string;
+  kind: string;
+  label: string;
+  status?: string;
+  fact_id?: string;
+};
+
+export type GraphEdge = {
+  source: string;
+  target: string;
+  kind: string;
+  status?: string;
+  fact_id?: string;
+};
+
+export type Graph = { nodes: GraphNode[]; edges: GraphEdge[] };
+
 const TOKEN_KEY = "tensemem_token";
 const USER_KEY = "tensemem_user";
 
@@ -74,10 +92,7 @@ export const api = {
     req<{ hits: Array<Record<string, unknown>>; freshness: Freshness; debug: Array<Record<string, unknown>> }>(
       `/v1/search?user_id=${encodeURIComponent(user_id)}&query=${encodeURIComponent(query)}`,
     ),
-  graph: (user_id: string) =>
-    req<{ nodes: Array<Record<string, string>>; edges: Array<Record<string, string>> }>(
-      `/v1/graph?user_id=${encodeURIComponent(user_id)}`,
-    ),
+  graph: (user_id: string) => req<Graph>(`/v1/graph?user_id=${encodeURIComponent(user_id)}`),
   explain: (fact_id: string) => req<Record<string, unknown>>(`/v1/explain?fact_id=${encodeURIComponent(fact_id)}`),
   jobs: (user_id: string) =>
     req<{ jobs: Array<Record<string, unknown>> }>(`/v1/jobs?user_id=${encodeURIComponent(user_id)}`),
@@ -86,7 +101,10 @@ export const api = {
   dismissJob: (id: string) =>
     req<Record<string, unknown>>("/v1/jobs:dismiss", { method: "POST", body: JSON.stringify({ id }) }),
   add: (user_id: string, text: string) =>
-    req<Record<string, unknown>>("/v1/memories:add", { method: "POST", body: JSON.stringify({ user_id, text }) }),
+    req<Record<string, unknown>>("/v1/memories:add", {
+      method: "POST",
+      body: JSON.stringify({ user_id, text, wait: false }),
+    }),
   context: (user_id: string, query: string, include_history = false) =>
     req<Record<string, unknown>>("/v1/context", {
       method: "POST",

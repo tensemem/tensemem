@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 import { api, type Fact } from "@/lib/api";
+import { JobNotice } from "../notice";
 import { ScopeBar } from "../scope";
 
 export default function MemoriesPage() {
@@ -12,6 +13,8 @@ export default function MemoriesPage() {
   const [facts, setFacts] = useState<Fact[]>([]);
   const [hits, setHits] = useState<Array<Record<string, unknown>>>([]);
   const [explain, setExplain] = useState<Record<string, unknown> | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [notice, setNotice] = useState(false);
   const [err, setErr] = useState("");
 
   const current = useRef("");
@@ -38,44 +41,73 @@ export default function MemoriesPage() {
       <p className="lead">Browse, search, add, replace, or forget a scope. Replace needs a new value.</p>
       <ScopeBar onUser={handleUser} />
       {err ? <p className="err">{err}</p> : null}
+      {notice ? <JobNotice onClose={() => setNotice(false)} /> : null}
       <div className="card" style={{ marginTop: "1rem" }}>
         <div className="row">
           <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="search" />
           <button
+            type="button"
+            disabled={busy === "search"}
             onClick={async () => {
-              const found = await api.search(user, query);
-              setHits(found.hits);
+              setBusy("search");
+              setErr("");
+              try {
+                const found = await api.search(user, query);
+                setHits(found.hits);
+              } catch (error) {
+                setErr(error instanceof Error ? error.message : "search failed");
+              } finally {
+                setBusy(null);
+              }
             }}
           >
-            Search
+            {busy === "search" ? "Searching…" : "Search"}
           </button>
         </div>
         <div className="row" style={{ marginTop: "0.7rem" }}>
           <textarea value={text} onChange={(event) => setText(event.target.value)} rows={2} style={{ flex: 1 }} />
           <button
             className="primary"
+            type="button"
+            disabled={!text.trim() || busy === "add"}
             onClick={async () => {
               setErr("");
+              setNotice(false);
+              setBusy("add");
               try {
                 await api.add(user, text);
                 setText("");
-                await load(user);
+                setNotice(true);
+                setBusy(null);
+                void load(user).catch((error: Error) => setErr(error.message));
               } catch (error) {
                 setErr(error instanceof Error ? error.message : "add failed");
+                setBusy(null);
               }
             }}
           >
-            Add
+            {busy === "add" ? "Adding…" : "Add"}
           </button>
           <button
+            type="button"
+            disabled={busy === "forget"}
             onClick={async () => {
-              if (confirm(`Forget ${user}?`)) {
+              if (!confirm(`Forget ${user}?`)) {
+                return;
+              }
+              setBusy("forget");
+              setErr("");
+              try {
                 await api.forget(user);
                 await load(user);
+              } catch (error) {
+                setErr(error instanceof Error ? error.message : "forget failed");
+              } finally {
+                setBusy(null);
               }
             }}
           >
-            Forget scope
+            {busy === "forget" ? "Forgetting…" : "Forget scope"}
           </button>
         </div>
       </div>
@@ -106,36 +138,52 @@ export default function MemoriesPage() {
                   </td>
                   <td className="col-actions">
                     <div className="actions">
-                      <button type="button" onClick={async () => setExplain(await api.explain(fact.id))}>
-                        Timeline
+                      <button
+                        type="button"
+                        disabled={busy === `explain:${fact.id}`}
+                        onClick={async () => {
+                          setBusy(`explain:${fact.id}`);
+                          try {
+                            setExplain(await api.explain(fact.id));
+                          } finally {
+                            setBusy(null);
+                          }
+                        }}
+                      >
+                        {busy === `explain:${fact.id}` ? "Loading…" : "Timeline"}
                       </button>
                       {fact.status === "ACTIVE" ? (
                         <>
                           <input
                             value={drafts[fact.id] ?? ""}
                             onChange={(event) =>
-                              setDrafts((current) => ({ ...current, [fact.id]: event.target.value }))
+                              setDrafts((currentDrafts) => ({ ...currentDrafts, [fact.id]: event.target.value }))
                             }
                             placeholder="replacement"
                           />
                           <button
                             type="button"
-                            disabled={!(drafts[fact.id] ?? "").trim()}
+                            disabled={!(drafts[fact.id] ?? "").trim() || busy === `replace:${fact.id}`}
                             onClick={async () => {
                               const replacement = (drafts[fact.id] ?? "").trim();
                               if (!replacement) {
                                 return;
                               }
-                              await api.correct(fact.id, replacement);
-                              setDrafts((current) => {
-                                const next = { ...current };
-                                delete next[fact.id];
-                                return next;
-                              });
-                              await load(user);
+                              setBusy(`replace:${fact.id}`);
+                              try {
+                                await api.correct(fact.id, replacement);
+                                setDrafts((currentDrafts) => {
+                                  const next = { ...currentDrafts };
+                                  delete next[fact.id];
+                                  return next;
+                                });
+                                await load(user);
+                              } finally {
+                                setBusy(null);
+                              }
                             }}
                           >
-                            Replace
+                            {busy === `replace:${fact.id}` ? "Replacing…" : "Replace"}
                           </button>
                         </>
                       ) : null}

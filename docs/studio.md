@@ -14,13 +14,13 @@ Open `http://127.0.0.1:3000`. Studio rewrites `/v1` to the server. Optional bear
 
 ## Screens
 
-- **Board** — safe-to-act verdict from freshness, dead jobs, hedges, corrections
-- **Memories** — browse, search, add, correct (deny / restore), forget, change timeline
-- **Playground** — one message then one question through the real path
+- **Board** — safe-to-act verdict; open jobs in a table (`LEASED` shows as In progress)
+- **Memories** — browse, search, add, correct (deny / restore), forget, change timeline. Add shows a submitted-job notice.
+- **Playground** — one message then one question; suggestions are past queries you typed, not fixed samples. Run path shows a submitted-job notice.
 - **Lab** — same query through TenseMem, concat, and token-overlap; stale leaks highlighted
-- **Map** — tense lanes and a fact graph (SUPERSEDES)
+- **Map** — every lane in a table; interactive fact graph (pan, zoom, drag, inspect, SUPERSEDES)
 - **Echo** — feed `context()` back in; fact count should stay flat
-- **Ops** — API keys, request log, provider name (secrets stay in the environment)
+- **Ops** — extractor and optional search ranking. Access tokens stay folded away; they lock `/v1` and are not model keys.
 
 **Load sample workspace** seeds `studio-demo` with GST / itinerary / invoice turns. It does not run on open.
 
@@ -38,4 +38,4 @@ cd /path/to/tensemem
 .venv/bin/tensemem --db ./studio.db serve --port 8080
 ```
 
-In Studio **Ops**, set provider to **gemini** and Save. **Memories → Add** then sends that text to Gemini (`gemini-3.6-flash`, then `gemini-3.5-flash-lite` / `gemini-3.8-flash` if a model is overloaded). Optional: `TENSEMEM_LLM=gemini` on serve start, or `TENSEMEM_LITELLM_MODEL` to pick another Gemini model id.
+In Studio **Ops**, set Extractor to **Gemini** and Save. **Memories → Add** then sends that text to Gemini (`gemini-3.6-flash`, then `gemini-3.5-flash-lite` / `gemini-3.8-flash` if a model is overloaded). Optional: `TENSEMEM_LLM=gemini` on serve start, or `TENSEMEM_LITELLM_MODEL` to pick another Gemini model id.

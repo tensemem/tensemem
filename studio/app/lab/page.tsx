@@ -10,6 +10,7 @@ export default function LabPage() {
   const [historyOn, setHistoryOn] = useState(false);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [retrieved, setRetrieved] = useState<Record<string, unknown> | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState("");
 
   return (
@@ -26,8 +27,11 @@ export default function LabPage() {
           <input type="checkbox" checked={historyOn} onChange={(event) => setHistoryOn(event.target.checked)} /> history
         </label>
         <button
+          type="button"
+          disabled={busy === "retrieve"}
           onClick={async () => {
             setErr("");
+            setBusy("retrieve");
             try {
               const [hits, packed] = await Promise.all([
                 api.search(user, query),
@@ -36,23 +40,30 @@ export default function LabPage() {
               setRetrieved({ hits: hits.hits, freshness: hits.freshness, debug: hits.debug, packed });
             } catch (error) {
               setErr(error instanceof Error ? error.message : "failed");
+            } finally {
+              setBusy(null);
             }
           }}
         >
-          Retrieve
+          {busy === "retrieve" ? "Retrieving…" : "Retrieve"}
         </button>
         <button
           className="primary"
+          type="button"
+          disabled={busy === "compare"}
           onClick={async () => {
             setErr("");
+            setBusy("compare");
             try {
               setResult(await api.compare(user, query, historyOn));
             } catch (error) {
               setErr(error instanceof Error ? error.message : "failed");
+            } finally {
+              setBusy(null);
             }
           }}
         >
-          Compare
+          {busy === "compare" ? "Comparing…" : "Compare"}
         </button>
       </div>
       {err ? <p className="err">{err}</p> : null}

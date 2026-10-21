@@ -2,12 +2,14 @@
 
 import { useCallback, useRef, useState } from "react";
 import { api } from "@/lib/api";
+import { jobBadgeClass, jobStatusLabel } from "@/lib/jobs";
 import { ScopeBar } from "./scope";
 
 export default function BoardPage() {
   const [user, setUser] = useState("studio-demo");
   const [risk, setRisk] = useState<Record<string, unknown> | null>(null);
   const [jobs, setJobs] = useState<Array<Record<string, unknown>>>([]);
+  const [busy, setBusy] = useState<string | null>(null);
   const [err, setErr] = useState("");
 
   const current = useRef("");
@@ -42,6 +44,7 @@ export default function BoardPage() {
   const verdict = String(risk?.verdict ?? "wait");
   const freshness = (risk?.freshness ?? {}) as Record<string, unknown>;
   const values = (risk?.values ?? {}) as Record<string, unknown>;
+  const openJobs = jobs.filter((job) => job.status !== "DONE");
 
   return (
     <>
@@ -72,40 +75,77 @@ export default function BoardPage() {
           </div>
         </div>
       ) : null}
-      {jobs.filter((job) => job.status !== "DONE").length ? (
-        <>
-          <h2>Jobs</h2>
-          {jobs
-            .filter((job) => job.status !== "DONE")
-            .map((job) => (
-            <div className="lane" key={String(job.id)}>
-              <div>{String(job.kind)}</div>
-              <div>
-                <span className={`badge ${job.status === "DEAD" ? "stop" : "wait"}`}>{String(job.status)}</span>
-                {job.last_error ? <span> {String(job.last_error)}</span> : null}
-                <button
-                  style={{ marginLeft: "0.5rem" }}
-                  onClick={async () => {
-                    await api.retryJob(String(job.id));
-                    await load(user);
-                  }}
-                >
-                  Retry
-                </button>
-                <button
-                  style={{ marginLeft: "0.4rem" }}
-                  onClick={async () => {
-                    await api.dismissJob(String(job.id));
-                    await load(user);
-                  }}
-                >
-                  Dismiss
-                </button>
-              </div>
-            </div>
-          ))}
-        </>
-      ) : null}
+      <h2>Jobs</h2>
+      {openJobs.length ? (
+        <div className="table-wrap">
+          <table className="facts jobs">
+            <thead>
+              <tr>
+                <th className="col-kind">Kind</th>
+                <th className="col-status">Status</th>
+                <th className="col-attempts">Tries</th>
+                <th className="col-object">Error</th>
+                <th className="col-job-actions">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {openJobs.map((job) => {
+                const id = String(job.id);
+                const failed = job.status === "DEAD";
+                return (
+                  <tr key={id}>
+                    <td className="col-kind">{String(job.kind)}</td>
+                    <td className="col-status">
+                      <span className="status">
+                        <span className={`dot ${job.status === "DEAD" ? "was" : "now"}`} />
+                        <span className={`badge ${jobBadgeClass(job.status)}`}>{jobStatusLabel(job.status)}</span>
+                      </span>
+                    </td>
+                    <td className="col-attempts">{String(job.attempts ?? 0)}</td>
+                    <td className="col-object">{job.last_error ? String(job.last_error) : "—"}</td>
+                    <td className="col-job-actions">
+                      <div className="actions">
+                        <button
+                          type="button"
+                          disabled={!failed || busy === `retry:${id}`}
+                          onClick={async () => {
+                            setBusy(`retry:${id}`);
+                            try {
+                              await api.retryJob(id);
+                              await load(user);
+                            } finally {
+                              setBusy(null);
+                            }
+                          }}
+                        >
+                          {busy === `retry:${id}` ? "Retrying…" : "Retry"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={!failed || busy === `dismiss:${id}`}
+                          onClick={async () => {
+                            setBusy(`dismiss:${id}`);
+                            try {
+                              await api.dismissJob(id);
+                              await load(user);
+                            } finally {
+                              setBusy(null);
+                            }
+                          }}
+                        >
+                          {busy === `dismiss:${id}` ? "Dismissing…" : "Dismiss"}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <p className="lead">No open jobs. Queued and in-progress extract work shows up here.</p>
+      )}
     </>
   );
 }

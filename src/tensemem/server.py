@@ -73,6 +73,7 @@ def dispatch(
         if verb == "GET" and route == "/health":
             return 200, {"ok": True}
         if verb == "POST" and route == "/v1/memories:add":
+            payload.setdefault("wait", False)
             return 200, _tool(mem, "remember", payload, agent_id=agent_id, namespace=namespace)
         if verb == "POST" and route == "/v1/context":
             return 200, _tool(
@@ -133,7 +134,8 @@ def serve(
     """Open ``path`` and serve the five routes until the process exits.
 
     The extract worker stays off so queued jobs from another process are not
-    claimed by ``FakeExtractor``. ``POST /v1/memories:add`` still waits.
+    claimed by ``FakeExtractor``. ``POST /v1/memories:add`` queues and returns;
+    pass ``wait: true`` to drain extract in the request.
     """
     if port < 1 or port > 65535:
         raise ValueError("port must be between 1 and 65535")

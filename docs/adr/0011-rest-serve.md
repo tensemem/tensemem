@@ -13,7 +13,7 @@ MCP covers a local stdio host. Non-Python clients and several processes that mus
 2. **Five routes, mapped onto the MCP tools:** `POST /v1/memories:add`, `POST /v1/context`, `GET /v1/state`, `GET /v1/history`, `DELETE /v1/scopes/{user_id}`. `GET /health` is a liveness probe. Bodies and query strings use the same JSON fields as the tools, including `freshness.is_current`.
 3. **The agent does not decide SET/UPDATE.** Add only ingests user text. Extraction and `resolve()` still apply typed ops (ADR 0002 / 0010).
 4. **FastAPI and uvicorn are an optional extra** (`tensemem[server]`). Route dispatch is independent of that import so CI can score the mapping without the extra.
-5. **Default extractor is `FakeExtractor`.** The background worker stays off so jobs already queued in a shared file are not claimed at startup. Add waits in the request so that message still extracts. The starter registry is the same as MCP.
+5. **Default extractor is `FakeExtractor`.** The background worker stays off so jobs already queued in a shared file are not claimed at startup. HTTP `POST /v1/memories:add` returns when the extract job is queued; pass `"wait": true` to drain extract in that request. MCP `remember` still waits unless `wait` is set. The starter registry is the same as MCP.
 
 ## Alternatives considered
 

@@ -1,16 +1,26 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
-import { api, type Fact } from "@/lib/api";
+import { useCallback, useMemo, useRef, useState } from "react";
+import { api, type Fact, type Graph } from "@/lib/api";
 import { ScopeBar } from "../scope";
+import { FactGraph } from "./graph";
+
+function badgeClass(status: string): string {
+  if (status === "ACTIVE") return "act";
+  if (status === "REJECTED") return "stop";
+  return "was";
+}
+
+function when(value: string | null): string {
+  if (!value) return "—";
+  return value.replace("T", " ").replace(/\.\d+.*/, "").replace("Z", "");
+}
 
 export default function MapPage() {
   const [user, setUser] = useState("studio-demo");
   const [facts, setFacts] = useState<Fact[]>([]);
-  const [graph, setGraph] = useState<{ nodes: Array<Record<string, string>>; edges: Array<Record<string, string>> }>({
-    nodes: [],
-    edges: [],
-  });
+  const [graph, setGraph] = useState<Graph>({ nodes: [], edges: [] });
+  const [selected, setSelected] = useState<string | null>(null);
   const [err, setErr] = useState("");
 
   const current = useRef("");
@@ -27,81 +37,91 @@ export default function MapPage() {
   const handleUser = useCallback(
     (who: string) => {
       setUser(who);
+      setSelected(null);
       void load(who).catch((error: Error) => setErr(error.message));
     },
     [load],
   );
 
-  const lanes = new Map<string, Fact[]>();
-  for (const fact of facts) {
-    const bucket = lanes.get(fact.predicate) ?? [];
-    bucket.push(fact);
-    lanes.set(fact.predicate, bucket);
-  }
+  const rows = useMemo(() => {
+    const rank = (status: string) => (status === "ACTIVE" ? 0 : status === "SUPERSEDED" ? 1 : 2);
+    return [...facts].sort((a, b) => {
+      const lane = a.predicate.localeCompare(b.predicate);
+      if (lane) return lane;
+      const status = rank(a.status) - rank(b.status);
+      if (status) return status;
+      return a.recorded_at.localeCompare(b.recorded_at);
+    });
+  }, [facts]);
+
+  const lanes = new Set(rows.map((fact) => fact.predicate)).size;
+  const supersedes = graph.edges.filter((edge) => edge.kind === "SUPERSEDES").length;
 
   return (
     <>
-      <h1>Tense lanes + fact graph</h1>
-      <p className="lead">One current value per ONE slot. Was vs is, plus SUPERSEDES edges.</p>
+      <h1>Map</h1>
+      <p className="lead">
+        Every lane in one table. The graph is subject → fact → object, with dashed SUPERSEDES when a newer value
+        replaced an older one.
+      </p>
       <ScopeBar onUser={handleUser} />
       {err ? <p className="err">{err}</p> : null}
+
       <h2>Lanes</h2>
-      {[...lanes.entries()].map(([predicate, rows]) => (
-        <div className="lane" key={predicate}>
-          <div>{predicate}</div>
-          <div>
-            {rows.map((fact) => (
-              <span key={fact.id} style={{ marginRight: "0.8rem" }}>
-                <span className={`dot ${fact.status === "ACTIVE" ? "now" : "was"}`} />
-                {fact.object}{" "}
-                <span className={`badge ${fact.status === "ACTIVE" ? "act" : "was"}`}>{fact.status}</span>
-              </span>
-            ))}
-          </div>
+      <p className="lead">
+        {rows.length} facts across {lanes} {lanes === 1 ? "lane" : "lanes"}. Click a row to focus that fact on the
+        graph.
+      </p>
+      {rows.length ? (
+        <div className="table-wrap table-wrap-lanes">
+          <table className="facts">
+            <thead>
+              <tr>
+                <th className="col-predicate">Lane</th>
+                <th className="col-subject">Subject</th>
+                <th className="col-object">Object</th>
+                <th className="col-status">Status</th>
+                <th className="col-when">Valid from</th>
+                <th className="col-when">Recorded</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((fact) => {
+                const nodeId = `f:${fact.id}`;
+                return (
+                  <tr
+                    key={fact.id}
+                    className={selected === nodeId ? "is-selected" : undefined}
+                    onClick={() => setSelected(nodeId)}
+                  >
+                    <td className="col-predicate">{fact.predicate}</td>
+                    <td className="col-subject">{fact.subject}</td>
+                    <td className="col-object">{fact.object}</td>
+                    <td className="col-status">
+                      <span className="status">
+                        <span className={`dot ${fact.status === "ACTIVE" ? "now" : "was"}`} />
+                        <span className={`badge ${badgeClass(fact.status)}`}>{fact.status}</span>
+                      </span>
+                    </td>
+                    <td className="col-when">{when(fact.valid_from)}</td>
+                    <td className="col-when">{when(fact.recorded_at)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
         </div>
-      ))}
+      ) : (
+        <p className="lead">No facts in this scope yet.</p>
+      )}
+
       <h2>Graph</h2>
-      <svg
-        viewBox={`0 0 900 ${Math.max(420, 50 + Math.ceil(graph.nodes.length / 6) * 90)}`}
-        width="100%"
-        height={Math.max(420, 50 + Math.ceil(graph.nodes.length / 6) * 90)}
-        style={{ background: "#101218", borderRadius: 10 }}
-      >
-        {graph.edges.map((edge, index) => {
-          const from = graph.nodes.findIndex((node) => node.id === edge.source);
-          const to = graph.nodes.findIndex((node) => node.id === edge.target);
-          if (from < 0 || to < 0) return null;
-          const x1 = 80 + (from % 6) * 140;
-          const y1 = 50 + Math.floor(from / 6) * 90;
-          const x2 = 80 + (to % 6) * 140;
-          const y2 = 50 + Math.floor(to / 6) * 90;
-          return (
-            <line
-              key={`${edge.source}-${edge.target}-${index}`}
-              x1={x1}
-              y1={y1}
-              x2={x2}
-              y2={y2}
-              stroke={edge.kind === "SUPERSEDES" ? "#d4a574" : "#2a2d36"}
-              strokeWidth={edge.kind === "SUPERSEDES" ? 2 : 1}
-            />
-          );
-        })}
-        {graph.nodes.map((node, index) => {
-          const x = 80 + (index % 6) * 140;
-          const y = 50 + Math.floor(index / 6) * 90;
-          const fill = node.kind === "fact" ? "#2a3344" : node.kind === "subject" ? "#243024" : "#322618";
-          return (
-            <g key={node.id}>
-              <circle cx={x} cy={y} r={18} fill={fill} stroke="#8b8678" />
-              <text x={x} y={y + 32} textAnchor="middle" fill="#e8e4d9" fontSize="11">
-                {(node.label ?? node.id).slice(0, 18)}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
-      <p className="lead">{graph.edges.filter((edge) => edge.kind === "SUPERSEDES").length} SUPERSEDES edges</p>
+      <p className="lead">{supersedes} SUPERSEDES {supersedes === 1 ? "edge" : "edges"}.</p>
+      {graph.nodes.length ? (
+        <FactGraph nodes={graph.nodes} edges={graph.edges} selectedId={selected} onSelect={setSelected} />
+      ) : (
+        <p className="lead">Nothing to draw until this scope has facts.</p>
+      )}
     </>
   );
 }

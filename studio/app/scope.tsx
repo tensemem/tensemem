@@ -7,6 +7,7 @@ export function ScopeBar({ onUser }: { onUser: (user: string) => void }) {
   const [user, setLocal] = useState("studio-demo");
   const [token, setTok] = useState("");
   const [scopes, setScopes] = useState<string[]>([]);
+  const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
   useEffect(() => {
@@ -52,8 +53,11 @@ export function ScopeBar({ onUser }: { onUser: (user: string) => void }) {
       </label>
       <button
         className="primary"
+        type="button"
+        disabled={busy}
         onClick={async () => {
           setErr("");
+          setBusy(true);
           try {
             await api.sample();
             setLocal("studio-demo");
@@ -61,10 +65,12 @@ export function ScopeBar({ onUser }: { onUser: (user: string) => void }) {
             onUser("studio-demo");
           } catch (error) {
             setErr(error instanceof Error ? error.message : "sample failed");
+          } finally {
+            setBusy(false);
           }
         }}
       >
-        Load sample workspace
+        {busy ? "Loading…" : "Load sample workspace"}
       </button>
       {err ? <span className="err">{err}</span> : null}
     </div>
