@@ -12,6 +12,7 @@ from collections.abc import Iterable, Mapping
 from pathlib import Path
 from typing import Any, Final, cast
 
+from tensemem import __version__
 from tensemem.auth import bind_warning, health_path
 from tensemem.core.errors import UnknownFactError, UnknownJobError
 from tensemem.eval.hosted import hosted_secret_status
@@ -167,7 +168,7 @@ def create_app(
     fastapi = _load("fastapi", "FastAPI")
     json_response = _load("fastapi.responses", "JSONResponse")
     request_type = _load("fastapi", "Request")
-    app = fastapi(title="TenseMem", version="0.0.1")
+    app = fastapi(title="TenseMem", version=__version__)
 
     async def handle(request: Any) -> Any:
         authorization = request.headers.get("authorization")

@@ -2,18 +2,24 @@
 
 ## Setup
 
-TenseMem uses [uv](https://docs.astral.sh/uv/) for environments and dependencies.
+TenseMem uses [uv](https://docs.astral.sh/uv/).
 
 ```bash
 git clone https://github.com/tensemem/tensemem.git
 cd tensemem
-uv sync                      # creates .venv with dev tools
-uv run pre-commit install    # lint and format on every commit
+uv sync
+uv run pre-commit install
+```
+
+Optional extras (same names as on PyPI):
+
+```bash
+uv sync --extra server --extra mcp
 ```
 
 ## Checks
 
-CI runs these on every pull request; run them locally before pushing:
+Run these from the repo root before you push. CI runs the same set.
 
 ```bash
 uv run ruff check .
@@ -23,31 +29,60 @@ uv run pytest
 uvx codespell --skip="*.lock,.git,uv.lock" --ignore-words-list="tensemem"
 ```
 
-The `tensemem` CLI (`python -m tensemem --help`) reads a SQLite file; it does not start the extract worker. `tensemem bench`, `tensemem longmem`, `tensemem locomo`, and `tensemem latency` are the exceptions: they do not open a database. `tensemem mcp` and `tensemem serve` create the file if missing and run `FakeExtractor` inside add (`uv sync --extra mcp` / `--extra server`); they do not drain jobs already queued in that file. `tensemem mcp --http` is Streamable HTTP. `--token` / `TENSEMEM_TOKEN` is optional bearer auth on HTTP. `TenseMemStore` (`tensemem[langgraph]`) is `put` / `search` over the same engine. `TenseMemChatMemory` (`tensemem[llamaindex]`) is `put` / `get` over the same engine. `tensemem longmem --llm` / `tensemem locomo --llm` are local hosted-pack commands; CI never passes `--llm`. TenseMem Studio is `studio/` (`npm run dev` against `tensemem serve`). Docs live in `docs/` with `mkdocs.yml` at the repo root (`uvx mkdocs serve` to preview). Property tests live in `tests/property/` (Hypothesis, 40 examples in CI; `HYPOTHESIS_PROFILE=dev` for a longer run). The golden extract set (`tests/golden/v1.jsonl`, 150+ labeled utterances) is scored with `python -m tensemem.eval` / `pytest tests/golden`.
-
-Default pytest never calls a model. To run the live extract locally after `uv sync --extra openai`:
+Default pytest never calls a model. After `uv sync --extra openai`:
 
 ```bash
 TENSEMEM_LIVE=1 uv run pytest -m live
 ```
 
-Every PR also gets free automated review gates:
-
 | Check | What it does |
 |---|---|
-| **CI** | Ruff (with inline annotations), format, pyright, pytest, package build |
-| **PR quality** | Requires `## What` / `## Why` / `## Docs` in the body; fails oversized diffs (>1000 lines unless labeled `large-pr`); actionlint posts workflow findings as review comments; gitleaks scans for secrets |
-| **CodeQL** | Security analysis for Python and GitHub Actions (free on public repos) |
-| **Live extract** | Not on every PR. A repository admin comments `/test` on a PR to run `pytest -m live` against a real model on one canonical chat (Delhi, then a move to Bangalore / Rust). It checks out the default branch only, so unmerged PR code never sees `OPENAI_API_KEY`. Test a branch locally with `TENSEMEM_LIVE=1`. |
+| **CI** | Ruff, format, pyright, pytest, package build |
+| **PR quality** | Requires `## What` / `## Why` / `## Docs`; fails diffs over 1000 lines unless labeled `large-pr`; actionlint; gitleaks |
+| **CodeQL** | Python and Actions |
+| **Live extract** | Not on every PR. A repo admin comments `/test` to run `pytest -m live` on the default branch only, so unmerged code never sees `OPENAI_API_KEY`. |
 
-We do **not** depend on third-party AI review apps (many look free then push a paid trial). Quality comes from the gates above plus human review.
+Branch protection should require at least `Lint and type-check`, `PR description and size`, and `Analyze (python)`.
 
-In branch protection, require at least: `Lint and type-check`, `PR description and size`, and `Analyze (python)`.
+## Studio and serve
 
-## Workflow
+Two processes, one SQLite file:
 
-- `main` is protected. All changes go through pull requests.
-- Keep each PR focused on one change, and describe what changed and why. Use the pull request template.
-- Significant design changes need an architecture decision record in `docs/adr/`.
-- Write commit messages in the imperative mood, for example "Add predicate registry".
-- Agents and editors should follow the project rules in [`.cursor/rules/`](.cursor/rules/) (short PRs, docs in the same change, vendor-neutral public docs).
+```bash
+uv sync --extra server
+uv run tensemem --db ./studio.db serve --port 8080
+# other terminal
+cd studio && npm install && npm run dev
+```
+
+Hosted extract (Gemini, OpenAI, …) reads keys from **that serve process environment**. Do not paste model keys into Studio Token. Token is `TENSEMEM_TOKEN` or an issued `tm_…` ops key.
+
+Do not commit `*.db`, `*.db-wal`, `*.db-shm`, Studio `node_modules`, or `.next`.
+
+## Pull requests
+
+`main` is protected. One concern per PR.
+
+1. Title includes exactly one of `[low-risk]`, `[medium-risk]`, `[high-risk]`.
+2. Add **one** new file `changes/<kebab-slug>.md` (What + Why), unless the title includes `[no-changeset]`.
+3. Significant design choices get an ADR in `docs/adr/` and a row in `docs/adr/README.md`.
+4. User-facing API or CLI changes update the README in the same PR. Do not refresh the README status line for internal-only slices.
+5. Public docs (README, ADRs, CONTRIBUTING, PR body) stay vendor-neutral: describe TenseMem by its properties, not by naming other products.
+6. No secrets, tokens, or database files in the commit.
+
+Body must include **What**, **Why**, and **Docs** (or “none needed” plus one line).
+
+## Commits
+
+Imperative mood (`Add freshness fields to context reads`). Group related changes. No `--no-verify`.
+
+## Public surface
+
+- `Memory` / `AsyncMemory` default to SQLite. `store=` takes a `SqliteBackend` (ADR 0020). A second SQL dialect is out of scope until its repositories exist.
+- Extract adapters live under `src/tensemem/providers/llm/`. Gemini is `generateContent` + `GEMINI_API_KEY`; it is not a LiteLLM model id in Token.
+- Docs site is `docs/` + `mkdocs.yml` (`uvx mkdocs serve`).
+- Property tests: `tests/property/` (40 examples in CI; `HYPOTHESIS_PROFILE=dev` for a longer run).
+- Golden extract: `tests/golden/v1.jsonl` via `python -m tensemem.eval`.
+- Bench: `tensemem bench` (packaged TenseBench). `tensemem longmem --llm` / `tensemem locomo --llm` are local-only; CI never passes `--llm`.
+
+Agents and editors should follow [`.cursor/rules/`](.cursor/rules/).

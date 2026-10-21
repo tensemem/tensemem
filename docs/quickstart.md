@@ -11,7 +11,7 @@ print(ctx.text)
 print(ctx.freshness.is_current)
 ```
 
-`FakeExtractor` is rule-based and needs no API key. For a real model, pass any `LLMProvider` (`tensemem[openai]`, `tensemem[anthropic]`, `tensemem[ollama]`, `tensemem[litellm]`).
+`FakeExtractor` is rule-based and needs no API key. Copy is in `examples/quickstart.py`. For a real model, pass any `LLMProvider` (`tensemem[openai]`, `tensemem[anthropic]`, `tensemem[ollama]`, `tensemem[litellm]`) or set `GEMINI_API_KEY` and use the Gemini adapter (`llm` name `gemini`). Do not put a model key in HTTP Token.
 
 Typed writes skip the extractor:
 
@@ -48,3 +48,13 @@ tensemem --db /absolute/path/tensemem.db serve --port 8080
 ```
 
 See [REST](server.md) for the routes.
+
+Local inspector ([Studio](studio.md)):
+
+```bash
+pip install "tensemem[server]"
+tensemem --db ./studio.db serve --port 8080
+cd studio && npm install && npm run dev
+```
+
+Open `http://127.0.0.1:3000`. Token is optional bearer auth, not a model key.

@@ -9,6 +9,8 @@ build/
 .ruff_cache/
 .pyright/
 *.db
+*.db-wal
+*.db-shm
 .DS_Store
 studio/node_modules/
 studio/.next/

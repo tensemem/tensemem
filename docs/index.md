@@ -2,7 +2,7 @@
 
 **Memory that knows its tenses.** Embedded, deterministic memory that AI agents can safely act on.
 
-TenseMem stores raw messages as an append-only log and projects them into facts with enforced cardinality, valid time, and a freshness watermark on every read. Recalled context is fenced so the engine does not learn from its own output. Corrections restore displaced values and survive a rebuild.
+**0.1.0 alpha.** One SQLite file. The model proposes typed facts; the engine decides what is current. Recalled context is fenced so the engine does not learn from its own output. Corrections restore displaced values and survive a rebuild.
 
 ## Start here
 
