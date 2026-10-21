@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/banner.png" alt="TenseMem — Embedded, deterministic memory that AI agents can safely act on" width="840">
+</p>
+
 # TenseMem
 
 **Memory that knows its tenses.** Embedded, deterministic memory that AI agents can safely act on.
