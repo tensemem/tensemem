@@ -98,14 +98,25 @@ Reproduce with `tensemem bench`. Methodology: [TenseBench](docs/tensebench.md).
 tensemem inspect --user u1
 tensemem history --user u1 lives_in
 tensemem search --user u1 "where did I live"
-tensemem serve          # HTTP on 127.0.0.1:8080
 ```
 
-[TenseMem Studio](docs/studio.md) is a local Next.js inspector over `tensemem serve` (board, memories table, playground, compare, echo). It is not a chatbot. Secrets stay in the serve process environment — never in the Token field.
+[TenseMem Studio](docs/studio.md) is a local Next.js inspector over `tensemem serve` (board, memories table, playground, compare, echo). It is not a chatbot. Secrets stay in the serve process environment — never in the Token field. Studio lives in the git checkout, not on PyPI.
 
 ```bash
+git clone https://github.com/tensemem/tensemem.git
+cd tensemem
 pip install "tensemem[server]"
+```
+
+Terminal 1 — HTTP:
+
+```bash
 tensemem --db ./studio.db serve --port 8080
+```
+
+Terminal 2 — Studio:
+
+```bash
 cd studio && npm install && npm run dev
 ```
 

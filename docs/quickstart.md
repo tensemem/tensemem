@@ -49,11 +49,23 @@ tensemem --db /absolute/path/tensemem.db serve --port 8080
 
 See [REST](server.md) for the routes.
 
-Local inspector ([Studio](studio.md)):
+Local inspector ([Studio](studio.md)) needs a repository checkout (`studio/` is not on PyPI). From the repo root:
 
 ```bash
+git clone https://github.com/tensemem/tensemem.git
+cd tensemem
 pip install "tensemem[server]"
+```
+
+Terminal 1 — HTTP:
+
+```bash
 tensemem --db ./studio.db serve --port 8080
+```
+
+Terminal 2 — Studio:
+
+```bash
 cd studio && npm install && npm run dev
 ```
 

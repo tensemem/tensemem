@@ -2,9 +2,23 @@
 
 Studio is a Next.js app that talks to `tensemem serve`. It is a memory inspector, not a chat window.
 
+Studio lives in the git checkout. From the repo root:
+
 ```bash
+git clone https://github.com/tensemem/tensemem.git
+cd tensemem
 pip install "tensemem[server]"
+```
+
+Terminal 1 — HTTP:
+
+```bash
 tensemem --db /absolute/path/tensemem.db serve --port 8080
+```
+
+Terminal 2 — Studio:
+
+```bash
 cd studio
 npm install
 npm run dev
