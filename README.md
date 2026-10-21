@@ -65,7 +65,7 @@ Every surface is an adapter over `Memory` / `AsyncMemory`. The model proposes ty
 
 ![TenseMem architecture: surfaces, write path, extract worker, read path, SQLite store, and providers](docs/architecture.svg)
 
-Editable source: [docs/architecture.excalidraw](docs/architecture.excalidraw) (open in [Excalidraw](https://excalidraw.com) or the VS Code extension, then export SVG over that file). File map: [Architecture](docs/architecture.md).
+Editable source: [docs/architecture.excalidraw](docs/architecture.excalidraw). File map: [Architecture](docs/architecture.md).
 
 | If you are changing… | Start here |
 |---|---|
