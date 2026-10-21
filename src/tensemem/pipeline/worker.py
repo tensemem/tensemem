@@ -33,7 +33,7 @@ from tensemem.pipeline.snapshot import ExtractSnapshot, load_extract_snapshot
 from tensemem.providers.embed.base import Embedder
 from tensemem.providers.llm.base import LLMProvider, ProviderError
 from tensemem.security.scrub import scrub
-from tensemem.storage.sqlite.database import SqliteDatabase
+from tensemem.storage.base import StorageBackend
 from tensemem.storage.sqlite.embeddings import (
     enqueue_episode_embed,
     enqueue_fact_embeds,
@@ -87,7 +87,7 @@ def qualifies(content: str) -> bool:
 
 
 def process_one(
-    db: SqliteDatabase,
+    db: StorageBackend,
     provider: LLMProvider | None,
     *,
     embedder: Embedder | None = None,
@@ -111,7 +111,7 @@ def process_one(
 
 
 def _process_extract(
-    db: SqliteDatabase,
+    db: StorageBackend,
     provider: LLMProvider,
     *,
     prefer_scope_id: int | None,
@@ -244,7 +244,7 @@ def _claim(
 
 
 def _fail(
-    db: SqliteDatabase, leased: _Leased, exc: BaseException, *, emit: Emit | None = None
+    db: StorageBackend, leased: _Leased, exc: BaseException, *, emit: Emit | None = None
 ) -> None:
     error = str(exc) or type(exc).__name__
     message = error[:_ERROR_LIMIT]
@@ -312,7 +312,7 @@ def _apply_extracted(
 
 
 def _process_embed(
-    db: SqliteDatabase,
+    db: StorageBackend,
     embedder: Embedder,
     *,
     prefer_scope_id: int | None,

@@ -23,6 +23,7 @@ Each record captures one significant design decision: the context, what we chose
 | [0017](0017-llamaindex-memory.md) | LlamaIndex chat memory is an adapter, not a second memory API | Accepted |
 | [0018](0018-studio.md) | Studio is a Next.js client over Memory | Accepted |
 | [0019](0019-studio-ops.md) | Studio ops chrome uses hashed keys and persisted provider names | Accepted |
+| [0020](0020-storage-backend.md) | StorageBackend is the store lifecycle, not a SQL dialect | Accepted |
 
 ## Template
 

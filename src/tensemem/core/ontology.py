@@ -2,7 +2,7 @@
 
 The engine ships with an empty registry. An ontology is just a TOML (or
 in-memory) description of predicates and entities that a caller may apply with
-:func:`~tensemem.storage.sqlite.seed.seed_ontology`.
+:meth:`~tensemem.storage.base.StorageBackend.seed`.
 """
 
 from __future__ import annotations

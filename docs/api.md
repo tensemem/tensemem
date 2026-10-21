@@ -5,7 +5,7 @@
 ```python
 from tensemem import Memory
 
-mem = Memory("app.db")  # or Memory(llm=..., embedder=...)
+mem = Memory("app.db")  # or Memory(llm=..., embedder=..., store=...)
 mem.register_predicate("lives_in")
 mem.register_predicate("uses_language", cardinality="MANY")
 
@@ -55,6 +55,7 @@ mem.forget(user_id="u1")
 
 - `backup(path)` uses SQLite's online backup API.
 - `export_jsonl` / `import_jsonl` replay predicates and episodes. Public ids change; use `backup()` for a bit-identical copy.
+- `Memory(..., store=)` injects a `StorageBackend` (default SQLite). `Memory.close()` does not close an injected store.
 - `Memory(..., hooks=[fn])` or `mem.on(fn)` receives `(event, payload)`. Hook errors are logged and ignored.
 - Structured logs go to the `tensemem` logger (`event=extraction scope_id=1 jobs=2`).
 - `tensemem mcp` maps `remember` / `recall_context` / `get_state` / `get_history` / `forget` onto this API. See [MCP](mcp.md).

@@ -1,5 +1,7 @@
 # Operations
 
+`Memory` talks to a `StorageBackend` (ADR 0020). The default is SQLite (`SqliteDatabase`). Pass `store=` to inject another implementation; conformance lives in `tests/storage/test_backend.py`.
+
 ## Backup
 
 ```python
