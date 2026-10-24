@@ -18,4 +18,4 @@ A clear and concise description of any alternative solutions or features you've 
 **Additional context**
 Add any other context or screenshots about the feature request here.
 
-⚠️ **Do not paste API keys or `tm_...` tokens here.** Please refer to [SECURITY.md](SECURITY.md).
+⚠️ **Do not paste API keys or `tm_...` tokens here.** Please refer to [SECURITY.md](https://github.com/tensemem/tensemem/blob/main/SECURITY.md).
