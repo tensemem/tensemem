@@ -28,4 +28,4 @@ If applicable, add screenshots.
 **Additional context**
 Add any other context about the problem here.
 
-⚠️ **Do not paste API keys or `tm_...` tokens here.** Please refer to [SECURITY.md](SECURITY.md).
+⚠️ **Do not paste API keys or `tm_...` tokens here.** Please refer to [SECURITY.md](https://github.com/tensemem/tensemem/blob/main/SECURITY.md).
