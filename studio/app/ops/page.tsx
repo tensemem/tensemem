@@ -22,6 +22,9 @@ function envReady(llm: string, credentials: Record<string, unknown>): string {
   if (llm === "fake") {
     return "Ready — no hosted key needed.";
   }
+  if (llm === "ollama") {
+    return "Ready — uses local Ollama.";
+  }
   if (credentials.ok) {
     return "Ready — serve has an env key.";
   }

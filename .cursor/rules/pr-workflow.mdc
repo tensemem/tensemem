@@ -15,6 +15,9 @@ alwaysApply: true
 
 ## Before opening the PR
 
+- For contributor work: get the GitHub issue **assigned to you** before you start; do not open a PR on an unassigned or someone else's issue.
+- Title must include exactly one of `[low-risk]`, `[medium-risk]`, `[high-risk]`.
+- Add **one new file** `changes/<kebab-slug>.md` (What + Why), unless the title includes `[no-changeset]`. See `changes/README.md`.
 - Update docs that readers need: README for user-facing behavior, `docs/adr/` for significant design choices, CONTRIBUTING for workflow changes.
 - New architecture decisions get an ADR (copy the existing ADR format; add a row to `docs/adr/README.md`).
 - Run locally: `uv run ruff check .`, `uv run ruff format --check .`, `uv run pyright`, `uv run pytest`.
@@ -23,13 +26,14 @@ alwaysApply: true
 
 - Title: imperative, specific (e.g. `Add freshness fields to context reads`).
 - Body must include:
+  - **Issue** — `Fixes #N` or `Refs #N` (required unless the title includes `[no-issue]`)
   - **What** — bullet list of concrete changes
   - **Why** — the problem or decision this addresses
   - **Docs** — what was updated, or "none needed" with a one-line reason
+  - **UI** — screenshots or a short video when `studio/` UI changes (unless the title includes `[no-ui]`)
 - No competitor product names in the PR title or body (see public-docs rule).
 
 ## Commits
 
 - Imperative mood; group related changes; no secrets, tokens, or build artifacts.
 ---
-

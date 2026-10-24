@@ -13,8 +13,47 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect paths
+    runs-on: ubuntu-latest
+    outputs:
+      python: ${{ steps.set.outputs.python }}
+      studio: ${{ steps.set.outputs.studio }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Path filter
+        id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@0e4a8c6effa4802afeda77dc8d303f8176d7dfad # v3.0.2
+        with:
+          filters: |
+            python:
+              - 'src/**'
+              - 'tests/**'
+              - 'pyproject.toml'
+              - 'uv.lock'
+              - 'examples/**'
+              - '.github/workflows/ci.yml'
+              - '.github/workflows/publish.yml'
+            studio:
+              - 'studio/**'
+              - '.github/workflows/ci.yml'
+      - name: Set outputs
+        id: set
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "python=true" >> "$GITHUB_OUTPUT"
+            echo "studio=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          echo "python=${{ steps.filter.outputs.python }}" >> "$GITHUB_OUTPUT"
+          echo "studio=${{ steps.filter.outputs.studio }}" >> "$GITHUB_OUTPUT"
+
   lint:
     name: Lint and type-check
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -30,6 +69,8 @@ jobs:
 
   test:
     name: Test (${{ matrix.os }}, Python ${{ matrix.python }})
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -47,6 +88,8 @@ jobs:
 
   build:
     name: Build distributions
+    needs: changes
+    if: needs.changes.outputs.python == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -54,19 +97,64 @@ jobs:
       - run: uv build
       - run: uvx twine check --strict dist/*
 
+  studio:
+    name: Studio
+    needs: changes
+    if: needs.changes.outputs.studio == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: studio
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: studio/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+        env:
+          NEXT_TELEMETRY_DISABLED: "1"
+
   # Single required check so branch protection does not list every matrix cell.
   required:
     name: CI
     if: always()
-    needs: [lint, test, build]
+    needs: [changes, lint, test, build, studio]
     runs-on: ubuntu-latest
     steps:
-      - name: All CI jobs passed
+      - name: All required path jobs passed
         run: |
           set -euo pipefail
+          echo "changes=${{ needs.changes.result }}"
+          echo "python=${{ needs.changes.outputs.python }}"
+          echo "studio=${{ needs.changes.outputs.studio }}"
           echo "lint=${{ needs.lint.result }}"
           echo "test=${{ needs.test.result }}"
           echo "build=${{ needs.build.result }}"
-          test "${{ needs.lint.result }}" = success
-          test "${{ needs.test.result }}" = success
-          test "${{ needs.build.result }}" = success
+          echo "studio_job=${{ needs.studio.result }}"
+          test "${{ needs.changes.result }}" = success
+
+          check_needed() {
+            local need=$1
+            local result=$2
+            local name=$3
+            if [ "$need" = "true" ]; then
+              test "$result" = success
+            else
+              case "$result" in
+                success|skipped) ;;
+                *)
+                  echo "::error::$name unexpected result: $result"
+                  exit 1
+                  ;;
+              esac
+            fi
+          }
+
+          check_needed "${{ needs.changes.outputs.python }}" "${{ needs.lint.result }}" lint
+          check_needed "${{ needs.changes.outputs.python }}" "${{ needs.test.result }}" test
+          check_needed "${{ needs.changes.outputs.python }}" "${{ needs.build.result }}" build
+          check_needed "${{ needs.changes.outputs.studio }}" "${{ needs.studio.result }}" studio

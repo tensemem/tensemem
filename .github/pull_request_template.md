@@ -1,5 +1,11 @@
 <!-- Title: imperative, with exactly one of [low-risk] [medium-risk] [high-risk]. -->
-<!-- Add changes/<kebab-slug>.md (What + Why) unless the title includes [no-changeset]. -->
+<!-- Get the issue assigned to you before you start. Add changes/<kebab-slug>.md unless the title includes [no-changeset]. -->
+
+## Issue
+
+<!-- Fixes #N closes the issue on merge. Refs #N links without closing. Use [no-issue] in the title only for maintainer work with no tracking issue. -->
+
+Fixes #
 
 ## What
 
@@ -16,6 +22,12 @@
 ## Docs
 
 <!-- What docs/ADRs/README changed, or "none needed" with a one-line reason. -->
+
+-
+
+## UI
+
+<!-- Required when the PR changes studio/ UI. Paste screenshots or a short video (before/after). Use [no-ui] in the title only when studio/ changes have no visible UI (e.g. package.json scripts). -->
 
 -
 
